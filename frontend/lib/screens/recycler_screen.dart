@@ -50,7 +50,14 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
 
   List<LotModel> get _filteredLots {
     if (_selectedCategoryFilter == 'ALL') return _lots;
-    return _lots.where((l) => l.category == _selectedCategoryFilter).toList();
+    final target = _selectedCategoryFilter.toUpperCase();
+    return _lots.where((l) {
+      final cat = l.category.toUpperCase();
+      if (target == 'ITEW') {
+        return cat == 'ITEW' || cat.contains('PHONE') || cat.contains('MOBILE') || cat.contains('HANDSET') || cat.contains('TABLET');
+      }
+      return cat == target;
+    }).toList();
   }
 
   void _showBidDialog(LotModel lot) {
@@ -380,13 +387,19 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                     children: [
                       _buildFilterChip(context, 'ALL', 'All Materials'),
                       const SizedBox(width: 8),
+                      _buildFilterChip(context, 'ITEW', 'Smartphones & Mobiles'),
+                      const SizedBox(width: 8),
                       _buildFilterChip(context, 'PCB', 'Circuit Boards (PCB)'),
                       const SizedBox(width: 8),
                       _buildFilterChip(context, 'BATTERY', 'Batteries (Haz)'),
                       const SizedBox(width: 8),
                       _buildFilterChip(context, 'CABLE', 'Copper Cables'),
                       const SizedBox(width: 8),
-                      _buildFilterChip(context, 'IT_EQUIPMENT', 'IT Scrap'),
+                      _buildFilterChip(context, 'IT_EQUIPMENT', 'IT Scrap & Laptops'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(context, 'DISPLAY', 'Displays & Screens'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(context, 'MIXED_SCRAP', 'Mixed Scrap'),
                     ],
                   ),
                 ),

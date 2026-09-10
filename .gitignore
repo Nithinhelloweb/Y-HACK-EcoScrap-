@@ -19,8 +19,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -49,6 +49,7 @@ media/
 *.pth
 *.onnx
 *.bin
+*.zip
 yolov8n.pt
 backend/yolov8n.pt
 
@@ -63,6 +64,7 @@ frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
 
 # IDE & OS
+*.iml
 .vscode/
 .idea/
 *.swp

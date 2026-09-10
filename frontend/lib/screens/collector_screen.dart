@@ -227,6 +227,9 @@ class _CollectorScreenState extends State<CollectorScreen> {
         apiService: widget.apiService,
       );
 
+      // Refresh lots so that the new lot and generated bids immediately display on screen
+      await _loadLots();
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -238,8 +241,16 @@ class _CollectorScreenState extends State<CollectorScreen> {
           ),
         ),
       );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.alertRed,
+          content: Text('Lot creation error: $e'),
+        ),
+      );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1156,7 +1167,91 @@ class _CollectorScreenState extends State<CollectorScreen> {
     );
   }
 
+  String _getNormalizedCategory(String cat) {
+    final upper = cat.toUpperCase();
+    if (upper == 'ITEW' || upper.contains('PHONE') || upper.contains('MOBILE') || upper.contains('HANDSET') || upper.contains('TABLET')) {
+      return 'ITEW';
+    }
+    if (upper == 'PCB' || upper.contains('CIRCUIT') || upper.contains('MOTHERBOARD') || upper.contains('BOARD')) {
+      return 'PCB';
+    }
+    if (upper == 'BATTERY' || upper.contains('CELL') || upper.contains('LITHIUM') || upper.contains('LEAD')) {
+      return 'BATTERY';
+    }
+    if (upper == 'CABLE' || upper.contains('WIRE') || upper.contains('COPPER')) {
+      return 'CABLE';
+    }
+    if (upper == 'IT_EQUIPMENT' || upper.contains('LAPTOP') || upper.contains('SERVER') || upper.contains('COMPUTER')) {
+      return 'IT_EQUIPMENT';
+    }
+    if (upper == 'DISPLAY' || upper.contains('MONITOR') || upper.contains('SCREEN') || upper.contains('PANEL')) {
+      return 'DISPLAY';
+    }
+    return 'MIXED_SCRAP';
+  }
+
+  String _getDefaultSubcategory(String cat) {
+    final norm = _getNormalizedCategory(cat);
+    switch (norm) {
+      case 'ITEW':
+        return 'SMARTPHONE_HANDSET';
+      case 'PCB':
+        return 'IT_HIGH_GRADE_PCB';
+      case 'BATTERY':
+        return 'LITHIUM_ION';
+      case 'CABLE':
+        return 'COPPER_RICH_CABLE';
+      case 'IT_EQUIPMENT':
+        return 'LAPTOP_WHOLE';
+      case 'DISPLAY':
+        return 'LED_MONITOR';
+      case 'MIXED_SCRAP':
+      default:
+        return 'MIXED_EWASTE';
+    }
+  }
+
+  List<Map<String, String>> _getSubcategoriesForCategory(String category) {
+    switch (category) {
+      case 'ITEW':
+        return [
+          {'value': 'SMARTPHONE_HANDSET', 'label': '📱 Smartphone / Handset'},
+          {'value': 'TABLET_DEVICE', 'label': '📱 Tablet / E-Reader'},
+        ];
+      case 'PCB':
+        return [
+          {'value': 'IT_HIGH_GRADE_PCB', 'label': '🟩 High-Grade Motherboard'},
+          {'value': 'LOW_GRADE_PCB', 'label': '🟨 Low-Grade SMPS Board'},
+        ];
+      case 'BATTERY':
+        return [
+          {'value': 'LITHIUM_ION', 'label': '🔋 Lithium-Ion Pack'},
+          {'value': 'LEAD_ACID', 'label': '⚡ Sealed Lead-Acid'},
+        ];
+      case 'CABLE':
+        return [
+          {'value': 'COPPER_RICH_CABLE', 'label': '🔌 High-Copper Cable'},
+        ];
+      case 'IT_EQUIPMENT':
+        return [
+          {'value': 'LAPTOP_WHOLE', 'label': '💻 Laptop Unit'},
+        ];
+      case 'DISPLAY':
+        return [
+          {'value': 'LED_MONITOR', 'label': '🖥️ Flat Panel LCD/LED'},
+          {'value': 'CRT_MONITOR', 'label': '📺 CRT Leaded Glass'},
+        ];
+      case 'MIXED_SCRAP':
+      default:
+        return [
+          {'value': 'MIXED_EWASTE', 'label': '📦 Mixed E-Scrap'},
+        ];
+    }
+  }
+
   Widget _buildLotFormCard() {
+    final normalizedCategory = _getNormalizedCategory(_selectedCategory);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
@@ -1182,24 +1277,68 @@ class _CollectorScreenState extends State<CollectorScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
+                  key: ValueKey(normalizedCategory),
+                  initialValue: normalizedCategory,
                   decoration: const InputDecoration(labelText: 'Category'),
                   dropdownColor: AppTheme.getCardBg(context),
                   items: const [
-                    DropdownMenuItem(value: 'PCB', child: Text('PCB Board')),
-                    DropdownMenuItem(value: 'BATTERY', child: Text('Battery')),
-                    DropdownMenuItem(value: 'CABLE', child: Text('Cables')),
-                    DropdownMenuItem(value: 'IT_EQUIPMENT', child: Text('IT Scrap')),
+                    DropdownMenuItem(value: 'ITEW', child: Text('Smartphones & Handsets')),
+                    DropdownMenuItem(value: 'PCB', child: Text('PCB Circuit Boards')),
+                    DropdownMenuItem(value: 'BATTERY', child: Text('Batteries (Li-Ion/Pb)')),
+                    DropdownMenuItem(value: 'CABLE', child: Text('Cables & Wiring')),
+                    DropdownMenuItem(value: 'IT_EQUIPMENT', child: Text('IT Scrap & Laptops')),
+                    DropdownMenuItem(value: 'DISPLAY', child: Text('Displays & Monitors')),
+                    DropdownMenuItem(value: 'MIXED_SCRAP', child: Text('Mixed E-Waste')),
                   ],
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() => _selectedCategory = val);
+                      setState(() {
+                        _selectedCategory = val;
+                        _selectedSubcategory = _getDefaultSubcategory(val);
+                      });
                       _fetchFairValue();
                     }
                   },
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Material Subtype / Grade:',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.getTextSecondary(context)),
+          ),
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _getSubcategoriesForCategory(normalizedCategory).map((sub) {
+                final isSelected = _selectedSubcategory == sub['value'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(sub['label']!),
+                    selected: isSelected,
+                    selectedColor: AppTheme.collectorColor.withValues(alpha: 0.18),
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                      color: isSelected ? AppTheme.collectorColor : AppTheme.getTextSecondary(context),
+                    ),
+                    side: BorderSide(
+                      color: isSelected ? AppTheme.collectorColor : AppTheme.getBorder(context),
+                    ),
+                    backgroundColor: AppTheme.getSurface(context),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() => _selectedSubcategory = sub['value']!);
+                        _fetchFairValue();
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(

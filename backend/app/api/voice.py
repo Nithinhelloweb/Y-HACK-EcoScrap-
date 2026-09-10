@@ -215,11 +215,11 @@ async def transcribe_audio(
     # 1. Primary: High-speed local Whisper model execution
     try:
         local_res = transcribe_audio_local(contents, language_hint=language_hint)
-        if local_res and local_res.get("text"):
+        if local_res is not None:
             return VoiceTranscriptionResponse(
-                text=local_res["text"],
-                detected_language=local_res["detected_language"],
-                confidence=local_res.get("confidence", 0.98)
+                text=local_res.get("text", ""),
+                detected_language=local_res.get("detected_language", language_hint or "en"),
+                confidence=local_res.get("confidence", 0.98 if local_res.get("text") else 0.50)
             )
     except Exception as local_err:
         logger.warning(f"Local Whisper transcription failed, trying cloud fallback: {local_err}")
@@ -255,7 +255,12 @@ async def transcribe_audio(
             confidence=0.98
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
+        logger.warning(f"Cloud Whisper transcription failed: {e}")
+        return VoiceTranscriptionResponse(
+            text="",
+            detected_language=language_hint or "en",
+            confidence=0.0
+        )
     finally:
         if os.path.exists(tmp_path):
             try:
