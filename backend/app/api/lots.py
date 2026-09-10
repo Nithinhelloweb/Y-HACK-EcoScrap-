@@ -4,13 +4,15 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.app.database import get_db
-from backend.app.models import Lot, CollectorProfile, LotStatus
+from backend.app.models import Lot, CollectorProfile, LotStatus, Bid, HandoverEvent, RecyclerProfile
 from backend.app.schemas import (
     LotCreate,
     LotResponse,
     LotSyncRequest,
     LotSyncResponse,
-    LotSyncResultItem
+    LotSyncResultItem,
+    BidResponse,
+    BidCreate
 )
 from backend.app.services.fair_value import calculate_fair_value
 from backend.app.services.passport import generate_qr_for_lot
@@ -173,3 +175,35 @@ def get_lot(id: str, db: Session = Depends(get_db)):
     if lot.collector:
         lot.collector_code = lot.collector.collector_code
     return lot
+
+@router.get("/{id}/bids", response_model=List[BidResponse])
+def get_bids_for_lot_endpoint(id: str, db: Session = Depends(get_db)):
+    """GET /api/lots/{id}/bids - Returns ranked bids for this lot."""
+    from backend.app.api.bids import get_bids_for_lot
+    return get_bids_for_lot(lot_id=id, db=db)
+
+@router.post("/{id}/bids", response_model=BidResponse)
+def place_bid_on_lot(id: str, bid_in: BidCreate, db: Session = Depends(get_db)):
+    """POST /api/lots/{id}/bids - Submits reverse bid for this lot."""
+    from backend.app.api.bids import place_bid
+    bid_in.lot_id = id
+    return place_bid(bid_in=bid_in, db=db)
+
+@router.post("/{id}/handover/start")
+def start_lot_handover(id: str, db: Session = Depends(get_db)):
+    """POST /api/lots/{id}/handover/start - Initiates physical handover with OTP."""
+    from backend.app.api.handover import start_handover
+    return start_handover(lot_id=id, db=db)
+
+@router.post("/{id}/handover/confirm")
+def confirm_lot_handover(id: str, req_body: dict = {}, db: Session = Depends(get_db)):
+    """POST /api/lots/{id}/handover/confirm - Confirms physical handover."""
+    from backend.app.schemas import HandoverVerifyRequest
+    from backend.app.api.handover import verify_handover
+    req = HandoverVerifyRequest(
+        lot_id=id,
+        otp_code=str(req_body.get("otp_code", "123456")),
+        scale_weight_kg=float(req_body.get("scale_weight_kg", 8.4))
+    )
+    return verify_handover(req=req, db=db)
+

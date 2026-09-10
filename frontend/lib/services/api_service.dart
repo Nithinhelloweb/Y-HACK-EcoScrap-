@@ -19,6 +19,84 @@ class ApiService {
     }
   }
 
+  Future<AIClassifyResult> classifyImageBytes({
+    required List<int> bytes,
+    required String filename,
+    String hintText = '',
+  }) async {
+    final uri = Uri.parse('$baseUrl/ai/classify-image');
+    final request = http.MultipartRequest('POST', uri);
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: filename,
+    ));
+    if (hintText.isNotEmpty) {
+      request.fields['hint_text'] = hintText;
+    }
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      return AIClassifyResult.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Image classification failed: ${response.body}');
+    }
+  }
+
+  Future<AIClassifyResult> classifyImageBase64({
+    required String base64Data,
+    String hintText = '',
+  }) async {
+    final uri = Uri.parse('$baseUrl/ai/classify-image');
+    final response = await http.post(uri, body: {
+      'image_base64': base64Data,
+      'hint_text': hintText,
+    });
+
+    if (response.statusCode == 200) {
+      return AIClassifyResult.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Image classification failed: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> extractOCR({
+    required String base64Data,
+  }) async {
+    final uri = Uri.parse('$baseUrl/ai/ocr');
+    final response = await http.post(uri, body: {
+      'image_base64': base64Data,
+    });
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('OCR text extraction failed: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> createCollectionDraft({
+    required String collectorId,
+    required List<Map<String, dynamic>> items,
+    String sourceType = 'household',
+  }) async {
+    final uri = Uri.parse('$baseUrl/collections');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'collector_id': collectorId,
+        'source_type': sourceType,
+        'items': items,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to create collection draft: ${response.body}');
+    }
+  }
+
   Future<Map<String, dynamic>> getFairValue({
     required String category,
     required String subcategory,

@@ -84,6 +84,8 @@ class CollectorProfile(Base):
 
     user = relationship("User", back_populates="collector_profile")
     lots = relationship("Lot", back_populates="collector")
+    collections = relationship("Collection", back_populates="collector", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="collector", cascade="all, delete-orphan")
 
 class RecyclerProfile(Base):
     __tablename__ = "recyclers"
@@ -186,3 +188,94 @@ class RiskEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     lot = relationship("Lot", back_populates="risk_events")
+
+class CollectionStatus:
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    CONVERTED_TO_LOT = "CONVERTED_TO_LOT"
+    CANCELLED = "CANCELLED"
+
+class PaymentStatus:
+    PENDING = "PENDING"
+    ESCROW_LOCKED = "ESCROW_LOCKED"
+    SETTLED = "SETTLED"
+    FAILED = "FAILED"
+
+class Collection(Base):
+    __tablename__ = "collections"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    collection_code = Column(String(50), unique=True, nullable=False, index=True)
+    collector_id = Column(String(36), ForeignKey("collectors.id"), nullable=False)
+    source_type = Column(String(50), default="household")  # household, commercial, institutional
+    status = Column(String(30), default=CollectionStatus.DRAFT)
+    total_items_count = Column(Float, default=0.0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    collector = relationship("CollectorProfile", back_populates="collections")
+    items = relationship("CollectionItem", back_populates="collection", cascade="all, delete-orphan")
+
+class CollectionItem(Base):
+    __tablename__ = "collection_items"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    collection_id = Column(String(36), ForeignKey("collections.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    normalized_type = Column(String(50), default="UNKNOWN")  # LAPTOP, COPPER_CABLE, BATTERY, PCB
+    quantity = Column(Float, default=1.0)
+    unit = Column(String(20), default="units")  # units, bags, kg, pieces
+    estimated_weight_kg = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    collection = relationship("Collection", back_populates="items")
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    transaction_reference = Column(String(100), unique=True, nullable=False, index=True)
+    lot_id = Column(String(36), ForeignKey("lots.id"), nullable=True)
+    collector_id = Column(String(36), ForeignKey("collectors.id"), nullable=False)
+    recycler_id = Column(String(36), ForeignKey("recyclers.id"), nullable=True)
+    amount = Column(Float, nullable=False)
+    currency = Column(String(10), default="INR")
+    status = Column(String(30), default=PaymentStatus.SETTLED)
+    payment_method = Column(String(50), default="UPI / Escrow Direct Bank")
+    settlement_date = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    collector = relationship("CollectorProfile", back_populates="payments")
+    lot = relationship("Lot")
+
+class VoiceSession(Base):
+    __tablename__ = "voice_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_token = Column(String(100), unique=True, nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    language = Column(String(10), default="en")
+    input_mode = Column(String(30), default="push_to_talk")  # push_to_talk, hands_free
+    status = Column(String(30), default="ACTIVE")
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+class VoiceToolLog(Base):
+    __tablename__ = "voice_tool_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(100), nullable=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    intent = Column(String(50), nullable=False)
+    tool_called = Column(String(50), nullable=False)
+    parameters_hash = Column(String(64), nullable=False)
+    execution_status = Column(String(30), default="SUCCESS")  # SUCCESS, FAILED, CONFIRMATION_REQUIRED
+    latency_ms = Column(Float, default=0.0)
+    error_code = Column(String(50), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+

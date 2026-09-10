@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     
     DATABASE_URL: str = ""
     
+    # Groq API configuration
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    
     def model_post_init(self, __context):
         if not self.DATABASE_URL:
             self.DATABASE_URL = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

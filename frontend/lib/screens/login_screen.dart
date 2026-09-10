@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../i18n/translations.dart';
+import '../theme/app_theme.dart';
+
+import '../widgets/ecoscrap_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
   final AuthService authService;
   final String currentLang;
   final Function(String) onLangChanged;
+  final VoidCallback? onToggleTheme;
+  final bool isDark;
 
   const LoginScreen({
     super.key,
@@ -15,6 +20,8 @@ class LoginScreen extends StatefulWidget {
     required this.authService,
     required this.currentLang,
     required this.onLangChanged,
+    this.onToggleTheme,
+    this.isDark = false,
   });
 
   @override
@@ -38,13 +45,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Color get _roleColor {
     switch (_selectedRole) {
       case 'COLLECTOR':
-        return Colors.tealAccent;
+        return AppTheme.collectorColor;
       case 'RECYCLER':
-        return Colors.lightBlueAccent;
+        return AppTheme.recyclerColor;
       case 'ADMIN':
-        return Colors.purpleAccent;
+        return AppTheme.adminColor;
       default:
-        return Colors.tealAccent;
+        return AppTheme.primaryGreen;
     }
   }
 
@@ -136,108 +143,165 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B132B),
+      backgroundColor: AppTheme.getBg(context),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.teal.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.recycling_rounded, color: Colors.tealAccent, size: 24),
-            ),
+            const EcoScrapLogo(size: 34, borderRadius: 10),
             const SizedBox(width: 10),
             Text(
               t('app_title'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppTheme.getTextPrimary(context)),
             ),
           ],
         ),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1C2541),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
+          // Theme Toggle in Login AppBar
+          if (widget.onToggleTheme != null) ...[
+            IconButton(
+              icon: Icon(
+                widget.isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                color: widget.isDark ? Colors.amber : const Color(0xFF475569),
+                size: 20,
+              ),
+              tooltip: widget.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+              onPressed: widget.onToggleTheme,
             ),
-            child: DropdownButton<String>(
-              value: widget.currentLang,
-              underline: const SizedBox(),
-              dropdownColor: const Color(0xFF1C2541),
-              icon: const Icon(Icons.language, color: Colors.tealAccent, size: 18),
-              items: const [
-                DropdownMenuItem(value: 'en', child: Text('English', style: TextStyle(fontSize: 13))),
-                DropdownMenuItem(value: 'ta', child: Text('தமிழ்', style: TextStyle(fontSize: 13))),
-                DropdownMenuItem(value: 'hi', child: Text('हिंदी', style: TextStyle(fontSize: 13))),
-              ],
-              onChanged: (val) {
-                if (val != null) widget.onLangChanged(val);
-              },
+            const SizedBox(width: 4),
+          ],
+
+          // Language Selector Dropdown
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.getCardBg(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.getBorder(context)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: widget.currentLang,
+                dropdownColor: AppTheme.getCardBg(context),
+                borderRadius: BorderRadius.circular(12),
+                icon: const Icon(Icons.language_rounded, color: AppTheme.primaryGreen, size: 18),
+                items: [
+                  DropdownMenuItem(value: 'en', child: Text('English', style: TextStyle(fontSize: 13, color: AppTheme.getTextPrimary(context)))),
+                  DropdownMenuItem(value: 'ta', child: Text('தமிழ் (Tamil)', style: TextStyle(fontSize: 13, color: AppTheme.getTextPrimary(context)))),
+                  DropdownMenuItem(value: 'hi', child: Text('हिंदी (Hindi)', style: TextStyle(fontSize: 13, color: AppTheme.getTextPrimary(context)))),
+                ],
+                onChanged: (val) {
+                  if (val != null) widget.onLangChanged(val);
+                },
+              ),
             ),
           ),
         ],
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Prominent Hero EcoScrap Logo
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    child: const EcoScrapLogo(
+                      size: 88,
+                      borderRadius: 22,
+                      heroTag: 'ecoscrap_hero_logo',
+                    ),
+                  ),
+                ),
+
+                // Clean Pill Badge
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: AppTheme.pillBadgeDecoration(AppTheme.primaryGreen, context: context),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_rounded, size: 14, color: AppTheme.primaryGreen),
+                        SizedBox(width: 6),
+                        Text(
+                          'E-Waste Formalization • Challenge 19',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primaryGreen,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Tagline & Intro
                 Text(
                   t('login_title'),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context), letterSpacing: -0.5),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   t('login_subtitle'),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.white70),
+                  style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context), height: 1.4),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // 1-Tap Quick Demo Logins Section
                 Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C2541),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.tealAccent.withValues(alpha: 0.3)),
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.cardBoxDecoration(
+                    color: AppTheme.getCardBg(context),
+                    borderColor: Colors.amber.withValues(alpha: 0.35),
+                    glow: true,
+                    glowColor: Colors.amber,
+                    context: context,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.bolt, color: Colors.amberAccent, size: 18),
-                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.bolt_rounded, color: AppTheme.alertAmber, size: 16),
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               t('quick_demo_heading'),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amberAccent),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.alertAmber),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       // 3 Quick Login Buttons
                       Row(
                         children: [
                           Expanded(
                             child: _demoButton(
+                              context: context,
                               label: 'Collector',
                               sub: 'Murugan K.',
-                              color: Colors.teal,
+                              color: AppTheme.collectorColor,
                               icon: Icons.person_pin_circle_rounded,
                               onTap: () => _handleQuickDemo('COLLECTOR'),
                             ),
@@ -245,9 +309,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: _demoButton(
+                              context: context,
                               label: 'Recycler',
                               sub: 'GreenTech',
-                              color: Colors.indigo,
+                              color: AppTheme.recyclerColor,
                               icon: Icons.factory_rounded,
                               onTap: () => _handleQuickDemo('RECYCLER'),
                             ),
@@ -255,9 +320,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: _demoButton(
+                              context: context,
                               label: 'Admin',
                               sub: 'CPCB Officer',
-                              color: Colors.purple,
+                              color: AppTheme.adminColor,
                               icon: Icons.shield_rounded,
                               onTap: () => _handleQuickDemo('ADMIN'),
                             ),
@@ -272,30 +338,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Role Selector Tabs
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C2541),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppTheme.isDark(context) ? AppTheme.surfaceDark : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.getBorder(context)),
                   ),
                   child: Row(
                     children: [
                       _roleTab(
+                        context: context,
                         role: 'COLLECTOR',
                         label: t('role_collector'),
                         icon: Icons.handyman_rounded,
-                        color: Colors.tealAccent,
+                        color: AppTheme.collectorColor,
                       ),
                       _roleTab(
+                        context: context,
                         role: 'RECYCLER',
                         label: t('role_recycler'),
                         icon: Icons.precision_manufacturing_rounded,
-                        color: Colors.lightBlueAccent,
+                        color: AppTheme.recyclerColor,
                       ),
                       _roleTab(
+                        context: context,
                         role: 'ADMIN',
                         label: t('role_admin'),
                         icon: Icons.gavel_rounded,
-                        color: Colors.purpleAccent,
+                        color: AppTheme.adminColor,
                       ),
                     ],
                   ),
@@ -304,68 +374,73 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
 
                 // Contextual Role Explanation Card
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: _roleColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _roleColor.withValues(alpha: 0.3)),
+                    border: Border.all(color: _roleColor.withValues(alpha: 0.25)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: _roleColor, size: 20),
+                      Icon(Icons.info_outline_rounded, color: _roleColor, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           _roleDescription(),
-                          style: TextStyle(color: _roleColor, fontSize: 12, fontWeight: FontWeight.w500),
+                          style: TextStyle(color: _roleColor, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
 
                 // Main Credential Form Card
                 Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C2541),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white10),
+                  padding: const EdgeInsets.all(22),
+                  decoration: AppTheme.cardBoxDecoration(
+                    color: AppTheme.getCardBg(context),
+                    borderColor: AppTheme.getBorder(context),
+                    context: context,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (_errorMessage != null) ...[
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade900.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.redAccent),
+                            color: AppTheme.alertRed.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.alertRed.withValues(alpha: 0.5)),
                           ),
-                          child: Text(
-                            '⚠️ $_errorMessage',
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline_rounded, color: AppTheme.alertRed, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
                       ],
 
                       if (!_isRegisterMode) ...[
                         // Identifier Field
                         TextField(
                           controller: _identifierController,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 14),
                           decoration: InputDecoration(
                             labelText: t('identifier_label'),
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(Icons.badge_outlined, color: Colors.tealAccent),
-                            filled: true,
-                            fillColor: const Color(0xFF0B132B),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            prefixIcon: Icon(Icons.badge_outlined, color: _roleColor, size: 20),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -373,93 +448,85 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _passwordController,
                           obscureText: !_isPasswordVisible,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 14),
                           decoration: InputDecoration(
                             labelText: t('password_label'),
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(Icons.lock_outline, color: Colors.tealAccent),
+                            prefixIcon: Icon(Icons.lock_outline_rounded, color: _roleColor, size: 20),
                             suffixIcon: IconButton(
-                              icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: Colors.white54),
+                              icon: Icon(
+                                _isPasswordVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                                color: AppTheme.getTextSecondary(context),
+                                size: 20,
+                              ),
                               onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                             ),
-                            filled: true,
-                            fillColor: const Color(0xFF0B132B),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 22),
                         // Login Action Button
                         ElevatedButton(
                           onPressed: widget.authService.isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _roleColor,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
                           ),
                           child: widget.authService.isLoading
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : Text(
                                   '${t('login_button')} as $_selectedRole',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.3),
                                 ),
                         ),
                       ] else ...[
                         // Registration Form
                         TextField(
                           controller: _regNameController,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 14),
                           decoration: InputDecoration(
-                            labelText: 'Full Name / Organization Name',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(Icons.person_outline, color: Colors.tealAccent),
-                            filled: true,
-                            fillColor: const Color(0xFF0B132B),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            labelText: 'Full Name / Organization',
+                            prefixIcon: Icon(Icons.person_outline_rounded, color: _roleColor, size: 20),
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _regPhoneController,
                           keyboardType: TextInputType.phone,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 14),
                           decoration: InputDecoration(
                             labelText: '10-Digit Mobile Number',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(Icons.phone_outlined, color: Colors.tealAccent),
-                            filled: true,
-                            fillColor: const Color(0xFF0B132B),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            prefixIcon: Icon(Icons.phone_outlined, color: _roleColor, size: 20),
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _regPasswordController,
                           obscureText: true,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: AppTheme.getTextPrimary(context), fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Choose Password',
-                            labelStyle: const TextStyle(color: Colors.white70),
-                            prefixIcon: const Icon(Icons.lock_outline, color: Colors.tealAccent),
-                            filled: true,
-                            fillColor: const Color(0xFF0B132B),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            prefixIcon: Icon(Icons.lock_outline_rounded, color: _roleColor, size: 20),
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 20),
                         ElevatedButton(
                           onPressed: widget.authService.isLoading ? null : _handleRegister,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _roleColor,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
                           ),
                           child: widget.authService.isLoading
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : Text(
                                   'Register as $_selectedRole',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.3),
                                 ),
                         ),
                       ],
@@ -479,7 +546,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             _isRegisterMode
                                 ? 'Already have an account? Sign In'
                                 : t('register_link'),
-                            style: const TextStyle(color: Colors.tealAccent, fontSize: 13),
+                            style: TextStyle(color: _roleColor, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -495,12 +562,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _roleTab({
+    required BuildContext context,
     required String role,
     required String label,
     required IconData icon,
     required Color color,
   }) {
     final isSelected = _selectedRole == role;
+    final isDark = AppTheme.isDark(context);
     return Expanded(
       child: GestureDetector(
         onTap: () => _onRoleChanged(role),
@@ -508,20 +577,33 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.25) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: isSelected ? Border.all(color: color, width: 1.5) : null,
+            color: isSelected
+                ? (isDark ? color.withValues(alpha: 0.22) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: color.withValues(alpha: 0.5), width: 1.5)
+                : Border.all(color: Colors.transparent, width: 1.5),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: isDark ? Colors.black38 : color.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             children: [
-              Icon(icon, color: isSelected ? color : Colors.white60, size: 20),
-              const SizedBox(height: 4),
+              Icon(icon, color: isSelected ? color : AppTheme.getTextSecondary(context), size: 20),
+              const SizedBox(height: 5),
               Text(
                 role == 'COLLECTOR' ? 'Collector' : (role == 'RECYCLER' ? 'Recycler' : 'Admin'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white60,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? AppTheme.getTextPrimary(context) : AppTheme.getTextSecondary(context),
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                   fontSize: 12,
                 ),
               ),
@@ -533,6 +615,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _demoButton({
+    required BuildContext context,
     required String label,
     required String sub,
     required Color color,
@@ -541,25 +624,27 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.6)),
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Column(
           children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(height: 4),
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 5),
             Text(
               label,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              style: TextStyle(color: AppTheme.getTextPrimary(context), fontWeight: FontWeight.w700, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 2),
             Text(
               sub,
-              style: const TextStyle(color: Colors.white70, fontSize: 10),
+              style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 10),
               overflow: TextOverflow.ellipsis,
             ),
           ],

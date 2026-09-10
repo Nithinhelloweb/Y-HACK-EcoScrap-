@@ -83,6 +83,27 @@ class MaterialClassifyResponse(BaseModel):
     safety_guidance: str
     estimated_base_rate_per_kg: float
     recommended_action: str
+    visual_features: Optional[Dict[str, Any]] = None
+    composition_breakdown: Optional[Dict[str, Any]] = None
+    fair_value_estimate: Optional[Dict[str, Any]] = None
+    image_analyzed: Optional[bool] = False
+    detected_components: Optional[List[Dict[str, Any]]] = None
+    component_analysis: Optional[Dict[str, Any]] = None
+    detected_text: Optional[str] = None
+    extracted_brands: Optional[List[str]] = None
+    extracted_models: Optional[List[str]] = None
+    hazard_keywords: Optional[List[str]] = None
+    ocr_confidence: Optional[float] = None
+
+class OCRResponse(BaseModel):
+    detected_text: str
+    extracted_brands: List[str]
+    extracted_models: List[str]
+    hazard_keywords: List[str]
+    inferred_material_hint: Optional[str] = None
+    ocr_confidence: float
+    total_words_detected: int
+    text_snippets: Optional[List[Dict[str, Any]]] = None
 
 # ----------------- Fair Value & Pricing -----------------
 class PriceFactor(BaseModel):
@@ -222,3 +243,104 @@ class PassportResponse(BaseModel):
     events_timeline: List[ChainEventResponse]
     recovered_fractions_estimate: Dict[str, float]
     environmental_savings: Dict[str, Any]
+
+# ----------------- Collections -----------------
+class CollectionItemCreate(BaseModel):
+    name: str
+    quantity: float = 1.0
+    unit: str = "units"
+    estimated_weight_kg: Optional[float] = None
+
+class CollectionItemResponse(BaseModel):
+    id: str
+    collection_id: str
+    name: str
+    normalized_type: str
+    quantity: float
+    unit: str
+    estimated_weight_kg: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+class CollectionCreate(BaseModel):
+    collector_id: Optional[str] = None
+    items: List[CollectionItemCreate] = []
+    source_type: str = "household"
+    notes: Optional[str] = None
+
+class CollectionResponse(BaseModel):
+    id: str
+    collection_code: str
+    collector_id: str
+    source_type: str
+    status: str
+    total_items_count: float
+    notes: Optional[str] = None
+    items: List[CollectionItemResponse] = []
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+# ----------------- Payments -----------------
+class PaymentResponse(BaseModel):
+    id: str
+    transaction_reference: str
+    lot_id: Optional[str] = None
+    collector_id: str
+    recycler_id: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: str
+    payment_method: str
+    settlement_date: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+# ----------------- Voice Assistant -----------------
+class VoiceSessionRequest(BaseModel):
+    language: Optional[str] = "en"
+    input_mode: Optional[str] = "push_to_talk"
+
+class VoiceSessionResponse(BaseModel):
+    session_id: str
+    session_token: str
+    user_id: str
+    collector_id: Optional[str] = None
+    language: str
+    input_mode: str
+    status: str
+    expires_at: datetime
+    tool_manifest: List[Dict[str, Any]] = []
+    openai_realtime_config: Optional[Dict[str, Any]] = None
+
+class VoiceCommandRequest(BaseModel):
+    session_id: Optional[str] = None
+    text: str
+    language_hint: Optional[str] = None
+    confirmed: Optional[bool] = None
+    context: Optional[Dict[str, Any]] = None
+
+class VoiceCommandResponse(BaseModel):
+    intent: str
+    detected_language: str
+    entities: Dict[str, Any]
+    missing_fields: List[str]
+    spoken_response: str
+    action_executed: Optional[str] = None
+    action_result: Optional[Dict[str, Any]] = None
+    requires_confirmation: bool = False
+    confirmation_prompt: Optional[str] = None
+    ui_payload: Optional[Dict[str, Any]] = None
+    session_id: Optional[str] = None
+    audio_url: Optional[str] = None
+
+class VoiceTranscriptionResponse(BaseModel):
+    text: str
+    detected_language: Optional[str] = None
+    confidence: Optional[float] = None
+
+class VoiceTTSRequest(BaseModel):
+    text: str
+    language: Optional[str] = "en"
+

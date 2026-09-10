@@ -114,7 +114,7 @@ def test_handover_verify_weight_mismatch_anomaly():
 def test_lot_processing_and_settlement():
     """Verify lot closure, circular yield breakdown, and payment settlement block."""
     db = SessionLocal()
-    lot = db.query(Lot).first()
+    lot = db.query(Lot).filter(Lot.category == "PCB").first() or db.query(Lot).first()
     assert lot is not None
 
     res = client.post(f"/api/handover/{lot.id}/process")
@@ -125,7 +125,7 @@ def test_lot_processing_and_settlement():
     assert data["settlement_status"] == "PAID"
     assert data["payment_reference"].startswith("TXN-TN-2026-")
     assert "recovered_fractions" in data
-    assert "copper_kg" in data["recovered_fractions"]
+    assert ("copper_kg" in data["recovered_fractions"] or "pure_copper_rod_kg" in data["recovered_fractions"])
     assert len(data["block_hash"]) == 64
 
     # Verify Block in ledger

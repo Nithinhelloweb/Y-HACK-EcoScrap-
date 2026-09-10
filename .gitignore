@@ -1,0 +1,72 @@
+# Environment & Secrets
+.env
+*.env
+.env.*
+!.env.example
+backend/.env
+backend/*.env
+backend/.env.*
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Databases & Media
+*.db
+*.sqlite
+*.sqlite3
+backend/ecoscrap.db
+backend/media/
+media/
+
+# AI Models & Weights
+*.pt
+*.pth
+*.onnx
+*.bin
+yolov8n.pt
+backend/yolov8n.pt
+
+# Flutter & Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

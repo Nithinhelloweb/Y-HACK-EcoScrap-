@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/lot_model.dart';
 import '../services/api_service.dart';
 import '../i18n/translations.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ecoscrap_logo.dart';
 
 class RecyclerScreen extends StatefulWidget {
   final ApiService apiService;
@@ -66,64 +68,103 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
             final isBelowFloor = lot.fairValueMin > 0 && offer < (lot.fairValueMin * 0.75);
 
             return AlertDialog(
-              title: Text('Submit Bid for ${lot.lotCode}'),
+              backgroundColor: AppTheme.getCardBg(context),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: AppTheme.getBorder(context)),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.recyclerColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.gavel_rounded, color: AppTheme.recyclerColor, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('Submit Bid: ${lot.lotCode}',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.getTextPrimary(context))),
+                  ),
+                ],
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Category: ${lot.category} (${lot.estimatedWeightKg} kg)'),
+                  Text('Material: ${lot.category} • ${lot.estimatedWeightKg} kg',
+                      style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 13)),
+                  const SizedBox(height: 4),
                   Text('Fair Range: ₹${lot.fairValueMin.toStringAsFixed(0)} – ₹${lot.fairValueMax.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.lightGreenAccent)),
-                  const SizedBox(height: 12),
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.collectorColor, fontSize: 13)),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: offerController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Offer Price (INR)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Offer Price (INR)', prefixText: '₹ '),
                     onChanged: (_) => setDialogState(() {}),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: deductionController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Logistics Deduction (INR)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Logistics Deduction (INR)', prefixText: '₹ '),
                     onChanged: (_) => setDialogState(() {}),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.black38,
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.surfaceDark,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.borderSubtle),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Net Collector Payable:', style: TextStyle(fontSize: 12)),
+                        const Text('Net Collector Payable:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                         Text('₹${netPayable.toStringAsFixed(0)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.tealAccent)),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.recyclerColor)),
                       ],
                     ),
                   ),
                   if (isBelowFloor) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF450A0A),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppTheme.alertRed.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.alertRed.withValues(alpha: 0.5)),
                       ),
-                      child: const Text(
-                        '🚨 WARNING: This offer is 25%+ below the fair minimum. It will be flagged by the EcoScrap Anomaly Shield.',
-                        style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: AppTheme.alertRed, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'WARNING: Offer is 25%+ below fair value. It will be flagged by the Anomaly Shield.',
+                              style: TextStyle(color: AppTheme.alertRed, fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+                ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.recyclerColor,
+                    foregroundColor: Colors.black,
+                  ),
                   onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(ctx);
@@ -140,14 +181,14 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                       if (bid.isAnomaly) {
                         messenger.showSnackBar(
                           SnackBar(
-                            backgroundColor: Colors.red.shade900,
+                            backgroundColor: AppTheme.alertRed,
                             content: Text('⚠️ ANOMALY ALERT: ${bid.anomalyReason}'),
                           ),
                         );
                       } else {
                         messenger.showSnackBar(
                           SnackBar(
-                            backgroundColor: Colors.green.shade800,
+                            backgroundColor: const Color(0xFF065F46),
                             content: Text('✅ Bid of ₹$offer submitted! Match score: ${bid.matchScore}/100'),
                           ),
                         );
@@ -160,7 +201,7 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                       );
                     }
                   },
-                  child: const Text('Submit Bid'),
+                  child: const Text('Submit Bid', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             );
@@ -177,6 +218,7 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: AppTheme.getCardBg(context),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         return Padding(
@@ -190,9 +232,24 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${t('handover_title')}: ${lot.lotCode}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.collectorColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.scale_rounded, color: AppTheme.collectorColor, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('${t('handover_title')}: ${lot.lotCode}',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.getTextPrimary(context))),
+                ],
+              ),
               const SizedBox(height: 6),
-              Text('Collector declared weight: ${lot.estimatedWeightKg} kg', style: const TextStyle(color: Colors.grey)),
+              Text('Collector declared weight: ${lot.estimatedWeightKg} kg • ±5% tolerance band',
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
               const SizedBox(height: 16),
               TextField(
                 controller: _otpController,
@@ -200,8 +257,7 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                 maxLength: 6,
                 decoration: InputDecoration(
                   labelText: t('enter_otp'),
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.pin),
+                  prefixIcon: const Icon(Icons.pin_rounded, color: AppTheme.recyclerColor),
                 ),
               ),
               const SizedBox(height: 10),
@@ -210,19 +266,21 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: t('verified_scale'),
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.scale),
+                  prefixIcon: const Icon(Icons.scale_rounded, color: AppTheme.collectorColor),
                   suffixText: 'kg',
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
-                height: 48,
                 child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700),
-                  icon: const Icon(Icons.verified),
-                  label: Text(t('confirm_handover'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.collectorColor,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(Icons.verified_rounded, size: 18),
+                  label: Text(t('confirm_handover'), style: const TextStyle(fontWeight: FontWeight.w800)),
                   onPressed: () async {
                     final scaleWt = double.tryParse(_scaleWeightController.text) ?? lot.estimatedWeightKg;
                     final otp = _otpController.text.trim();
@@ -238,7 +296,7 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          backgroundColor: res['flagged_anomaly'] == true ? Colors.orange.shade900 : Colors.green.shade800,
+                          backgroundColor: res['flagged_anomaly'] == true ? AppTheme.alertAmber : const Color(0xFF065F46),
                           content: Text(res['message'] ?? 'Handover complete!'),
                         ),
                       );
@@ -246,7 +304,7 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                     } catch (e) {
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(backgroundColor: Colors.red, content: Text('Handover verification failed: $e')),
+                        SnackBar(backgroundColor: AppTheme.alertRed, content: Text('Handover verification failed: $e')),
                       );
                     }
                   },
@@ -261,142 +319,244 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t('recycler_tab')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchLots,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+    return RefreshIndicator(
+      color: AppTheme.recyclerColor,
+      backgroundColor: AppTheme.getCardBg(context),
+      onRefresh: _fetchLots,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.recyclerColor))
           : ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
               children: [
-                // Recycler Info Header
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Icon(Icons.factory_rounded, color: Colors.tealAccent, size: 40),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('GreenTech Circular Solutions Pvt Ltd', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('CPCB Reg: CPCB-TN-REC-2024-8812 • SIDCO Estate', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                              SizedBox(height: 4),
-                              Text('⭐ 96% Reliability Rating • Daily Cap: 2,500 kg', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
-                            ],
-                          ),
+                // Recycler Profile Header Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.cardBoxDecoration(
+                    color: AppTheme.getCardBg(context),
+                    borderColor: AppTheme.recyclerColor.withValues(alpha: 0.35),
+                    context: context,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const EcoScrapLogo(size: 48, borderRadius: 14),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('GreenTech Circular Solutions',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
+                            const SizedBox(height: 2),
+                            Text('CPCB Reg: CPCB-TN-REC-2024-8812 • SIDCO Estate',
+                                style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: AppTheme.pillBadgeDecoration(AppTheme.recyclerColor, context: context),
+                                  child: const Text('⭐ 96% Reliability Rating',
+                                      style: TextStyle(color: AppTheme.recyclerColor, fontSize: 11, fontWeight: FontWeight.w800)),
+                                ),
+                                Text('Cap: 2,500 kg/day', style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // Material Category Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('ALL', 'All Materials'),
+                      _buildFilterChip(context, 'ALL', 'All Materials'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('PCB', 'Circuit Boards (PCB)'),
+                      _buildFilterChip(context, 'PCB', 'Circuit Boards (PCB)'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('BATTERY', 'Batteries (Haz)'),
+                      _buildFilterChip(context, 'BATTERY', 'Batteries (Haz)'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('CABLE', 'Copper Cables'),
+                      _buildFilterChip(context, 'CABLE', 'Copper Cables'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('IT_EQUIPMENT', 'IT Scrap'),
+                      _buildFilterChip(context, 'IT_EQUIPMENT', 'IT Scrap'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                Text('Active E-Waste Lots (${_filteredLots.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                // Marketplace Lots Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.recyclerColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.storefront_rounded, color: AppTheme.recyclerColor, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('Active E-Waste Lots (${_filteredLots.length})',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context))),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.recyclerColor, size: 20),
+                      tooltip: 'Refresh marketplace',
+                      onPressed: _fetchLots,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
 
                 if (_filteredLots.isEmpty)
-                  const Center(child: Padding(padding: EdgeInsets.all(20.0), child: Text('No active lots matching this filter.'))),
-
-                ..._filteredLots.map((lot) => _buildRecyclerLotCard(lot)),
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+                    child: Column(
+                      children: [
+                        Icon(Icons.inventory_rounded, size: 40, color: AppTheme.getTextSecondary(context)),
+                        const SizedBox(height: 10),
+                        Text('No active lots matching this filter.',
+                            style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  )
+                else
+                  ..._filteredLots.map((lot) => _buildRecyclerLotCard(context, lot)),
               ],
             ),
     );
   }
 
-  Widget _buildFilterChip(String filterKey, String label) {
+  Widget _buildFilterChip(BuildContext context, String filterKey, String label) {
     final isSelected = _selectedCategoryFilter == filterKey;
-    return FilterChip(
+    return ChoiceChip(
       selected: isSelected,
       label: Text(label),
-      selectedColor: Colors.teal.shade800,
+      selectedColor: AppTheme.recyclerColor.withValues(alpha: 0.2),
+      backgroundColor: AppTheme.isDark(context) ? AppTheme.surfaceDark : const Color(0xFFF1F5F9),
+      side: BorderSide(
+        color: isSelected ? AppTheme.recyclerColor : AppTheme.getBorder(context),
+        width: 1,
+      ),
+      labelStyle: TextStyle(
+        color: isSelected ? AppTheme.recyclerColor : AppTheme.getTextSecondary(context),
+        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+        fontSize: 12,
+      ),
       onSelected: (_) {
         setState(() => _selectedCategoryFilter = filterKey);
       },
     );
   }
 
-  Widget _buildRecyclerLotCard(LotModel lot) {
-    return Card(
+  Widget _buildRecyclerLotCard(BuildContext context, LotModel lot) {
+    final statusColor = lot.status == 'OPEN_FOR_BIDS'
+        ? AppTheme.recyclerColor
+        : (lot.status == 'BID_SELECTED' ? AppTheme.alertAmber : AppTheme.collectorColor);
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(lot.lotCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.tealAccent)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade900,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(lot.status, style: const TextStyle(fontSize: 11)),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(lot.lotCode, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.recyclerColor)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: AppTheme.pillBadgeDecoration(statusColor, context: context),
+                child: Text(lot.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.isDark(context) ? AppTheme.surfaceDark : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text('Material: ${lot.category} • ${lot.subcategory}'),
-            Text('Estimated Weight: ${lot.estimatedWeightKg} kg • Condition: ${lot.condition}'),
-            Text('Fair Range: ₹${lot.fairValueMin.toStringAsFixed(0)} – ₹${lot.fairValueMax.toStringAsFixed(0)}',
-                style: const TextStyle(color: Colors.lightGreenAccent, fontWeight: FontWeight.bold)),
-            const Divider(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (lot.status == 'OPEN_FOR_BIDS')
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                    icon: const Icon(Icons.gavel, size: 16),
-                    label: const Text('Place Reverse Bid'),
-                    onPressed: () => _showBidDialog(lot),
-                  )
-                else if (lot.status == 'BID_SELECTED' || lot.status == 'HANDOVER_SCHEDULED')
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                    icon: const Icon(Icons.scale, size: 16),
-                    label: const Text('Verify Scale & OTP'),
-                    onPressed: () => _showHandoverModal(lot),
-                  )
-                else if (lot.status == 'RECEIVED')
-                  const Text('✅ Received & Verified at Scale', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ],
-        ),
+                child: Text('${lot.category} • ${lot.subcategory}',
+                    style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.isDark(context) ? AppTheme.surfaceDark : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('${lot.estimatedWeightKg} kg (${lot.condition})',
+                    style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text('Fair Valuation: ₹${lot.fairValueMin.toStringAsFixed(0)} – ₹${lot.fairValueMax.toStringAsFixed(0)}',
+              style: const TextStyle(color: AppTheme.collectorColor, fontWeight: FontWeight.w800, fontSize: 13)),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (lot.status == 'OPEN_FOR_BIDS')
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.recyclerColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(130, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.gavel_rounded, size: 16),
+                  label: const Text('Place Reverse Bid', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () => _showBidDialog(lot),
+                )
+              else if (lot.status == 'BID_SELECTED' || lot.status == 'HANDOVER_SCHEDULED')
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4338CA),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(140, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.scale_rounded, size: 16),
+                  label: const Text('Verify Scale & OTP', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () => _showHandoverModal(lot),
+                )
+              else if (lot.status == 'RECEIVED')
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: AppTheme.collectorColor, size: 16),
+                    SizedBox(width: 6),
+                    Text('Received & Scale Verified',
+                        style: TextStyle(color: AppTheme.collectorColor, fontWeight: FontWeight.w800, fontSize: 12)),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

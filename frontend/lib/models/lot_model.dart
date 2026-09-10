@@ -28,6 +28,17 @@ class AIClassifyResult {
   final String safetyGuidance;
   final double estimatedBaseRatePerKg;
   final String recommendedAction;
+  final Map<String, dynamic>? visualFeatures;
+  final Map<String, dynamic>? compositionBreakdown;
+  final Map<String, dynamic>? fairValueEstimate;
+  final bool imageAnalyzed;
+  final List<dynamic>? detectedComponents;
+  final Map<String, dynamic>? componentAnalysis;
+  final String? detectedText;
+  final List<String> extractedBrands;
+  final List<String> extractedModels;
+  final List<String> hazardKeywords;
+  final double ocrConfidence;
 
   AIClassifyResult({
     required this.category,
@@ -39,6 +50,17 @@ class AIClassifyResult {
     required this.safetyGuidance,
     required this.estimatedBaseRatePerKg,
     required this.recommendedAction,
+    this.visualFeatures,
+    this.compositionBreakdown,
+    this.fairValueEstimate,
+    this.imageAnalyzed = false,
+    this.detectedComponents,
+    this.componentAnalysis,
+    this.detectedText,
+    this.extractedBrands = const [],
+    this.extractedModels = const [],
+    this.hazardKeywords = const [],
+    this.ocrConfidence = 0.0,
   });
 
   factory AIClassifyResult.fromJson(Map<String, dynamic> json) {
@@ -52,6 +74,17 @@ class AIClassifyResult {
       safetyGuidance: json['safety_guidance'] ?? 'Handle with standard caution.',
       estimatedBaseRatePerKg: (json['estimated_base_rate_per_kg'] as num?)?.toDouble() ?? 250.0,
       recommendedAction: json['recommended_action'] ?? 'Create digital lot',
+      visualFeatures: json['visual_features'] as Map<String, dynamic>?,
+      compositionBreakdown: json['composition_breakdown'] as Map<String, dynamic>?,
+      fairValueEstimate: json['fair_value_estimate'] as Map<String, dynamic>?,
+      imageAnalyzed: json['image_analyzed'] == true,
+      detectedComponents: json['detected_components'] as List<dynamic>?,
+      componentAnalysis: json['component_analysis'] as Map<String, dynamic>?,
+      detectedText: json['detected_text'],
+      extractedBrands: List<String>.from(json['extracted_brands'] ?? []),
+      extractedModels: List<String>.from(json['extracted_models'] ?? []),
+      hazardKeywords: List<String>.from(json['hazard_keywords'] ?? []),
+      ocrConfidence: (json['ocr_confidence'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

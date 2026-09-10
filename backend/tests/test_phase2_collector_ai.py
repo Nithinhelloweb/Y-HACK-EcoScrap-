@@ -130,3 +130,76 @@ def test_collector_profile_trust_score():
     assert collector.total_collections_count > 0
     assert collector.collector_code.startswith("COL-TN-")
     db.close()
+
+def test_live_camera_image_classification_pcb():
+    """Verify live camera snapshot file upload classifies PCB and yields visual features."""
+    import io
+    from PIL import Image
+
+    # Generate synthetic green PCB image
+    img = Image.new("RGB", (100, 100), color=(20, 140, 40))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    img_bytes = buf.getvalue()
+
+    res = client.post(
+        "/api/ai/classify-image",
+        files={"file": ("pcb_board.jpg", img_bytes, "image/jpeg")},
+        data={"hint_text": "motherboard scan"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["category"] == "PCB"
+    assert data["subcategory"] == "IT_HIGH_GRADE_PCB"
+    assert data["image_analyzed"] is True
+    assert "visual_features" in data
+    assert data["visual_features"]["green_ratio"] > 0.3
+    assert "composition_breakdown" in data
+    assert "gold_ppm" in data["composition_breakdown"]
+    assert "fair_value_estimate" in data
+
+def test_live_camera_image_classification_battery_hazard():
+    """Verify live camera image analysis detects battery hazards."""
+    import io
+    from PIL import Image
+
+    # Generate dark battery casing image
+    img = Image.new("RGB", (80, 80), color=(25, 25, 30))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+
+    res = client.post(
+        "/api/ai/classify-image",
+        files={"file": ("battery_cell.png", img_bytes, "image/png")},
+        data={"hint_text": "swollen lithium battery pack"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["category"] == "BATTERY"
+    assert data["subcategory"] == "LITHIUM_ION"
+    assert "THERMAL_RUNAWAY_RISK" in data["safety_flags"]
+    assert "CRITICAL HAZARD" in data["safety_guidance"]
+
+def test_live_camera_base64_upload():
+    """Verify live camera base64 snapshot payload analysis."""
+    import base64
+    import io
+    from PIL import Image
+
+    # Generate synthetic copper wire image (metallic orange-red)
+    img = Image.new("RGB", (90, 90), color=(185, 95, 30))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    b64_str = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    res = client.post(
+        "/api/ai/classify-image",
+        data={"image_base64": b64_str, "hint_text": "copper wires"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["category"] == "CABLE"
+    assert data["subcategory"] == "COPPER_RICH_CABLE"
+    assert data["image_analyzed"] is True
+

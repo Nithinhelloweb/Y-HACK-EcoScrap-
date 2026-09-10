@@ -1,0 +1,248 @@
+import os
+import io
+import logging
+import threading
+from typing import Dict, Any, List, Optional
+from PIL import Image
+import numpy as np
+
+logger = logging.getLogger("ecoscrap.local_vision")
+logging.basicConfig(level=logging.INFO)
+
+_yolo_lock = threading.Lock()
+_yolo_model = None
+
+# CPCB Price benchmarks (INR)
+CPCB_BENCHMARKS = {
+    "SMARTPHONE": {"category": "ITEW", "price_per_unit": 650.0, "price_per_kg": 850.0, "hazardous": True},
+    "TABLET": {"category": "ITEW", "price_per_unit": 850.0, "price_per_kg": 620.0, "hazardous": True},
+    "LAPTOP": {"category": "ITEW", "price_per_unit": 1850.0, "price_per_kg": 480.0, "hazardous": False},
+    "PRINTED_CIRCUIT_BOARD": {"category": "ITEW", "price_per_kg": 550.0, "hazardous": False},
+    "LOW_GRADE_PCB": {"category": "PCB", "price_per_kg": 110.0, "hazardous": False},
+    "BATTERY_LITHIUM_ION": {"category": "HAZARDOUS_COMPONENTS", "price_per_kg": 180.0, "hazardous": True},
+    "BATTERY_LEAD_ACID": {"category": "HAZARDOUS_COMPONENTS", "price_per_kg": 85.0, "hazardous": True},
+    "COPPER_CABLE": {"category": "CEEW", "price_per_kg": 420.0, "hazardous": False},
+    "MONITOR_DISPLAY": {"category": "ITEW", "price_per_unit": 380.0, "price_per_kg": 140.0, "hazardous": True},
+    "CRT_DISPLAY": {"category": "ITEW", "price_per_unit": 200.0, "price_per_kg": 65.0, "hazardous": True},
+    "CAPACITORS_TRANSFORMERS": {"category": "CEEW", "price_per_kg": 160.0, "hazardous": False},
+    "MIXED_EWASTE": {"category": "CEEW", "price_per_kg": 110.0, "hazardous": False}
+}
+
+# Electronics mappings from standard YOLO classes
+YOLO_ELECTRONICS_MAP = {
+    "cell phone": "SMARTPHONE",
+    "laptop": "LAPTOP",
+    "tv": "MONITOR_DISPLAY",
+    "keyboard": "PRINTED_CIRCUIT_BOARD",
+    "mouse": "PRINTED_CIRCUIT_BOARD",
+    "microwave": "MIXED_EWASTE",
+    "refrigerator": "MIXED_EWASTE",
+    "remote": "SMARTPHONE"
+}
+
+def get_yolo_model():
+    """
+    Returns the loaded Ultralytics YOLOv8 instance (singleton).
+    Thread-safe.
+    """
+    global _yolo_model
+    if _yolo_model is None:
+        with _yolo_lock:
+            if _yolo_model is None:
+                try:
+                    from ultralytics import YOLO
+                    # Check backend directory or root directory for weights
+                    candidates = [
+                        os.getenv("YOLO_WEIGHTS_PATH", ""),
+                        "yolov8n.pt",
+                        "backend/yolov8n.pt",
+                        os.path.join(os.path.dirname(__file__), "..", "..", "yolov8n.pt")
+                    ]
+                    weights_path = "yolov8n.pt"
+                    for c in candidates:
+                        if c and os.path.exists(c):
+                            weights_path = c
+                            break
+
+                    logger.info(f"Loading local YOLO model: {weights_path}")
+                    _yolo_model = YOLO(weights_path)
+                    logger.info("Local YOLO model loaded successfully.")
+                except Exception as e:
+                    logger.error(f"Failed to load YOLO model: {e}")
+                    raise
+    return _yolo_model
+
+def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
+    """
+    Runs local YOLOv8 neural detection combined with specialized electronic component
+    color, aspect ratio, and texture heuristics.
+    
+    Accepts:
+      - PIL Image
+      - bytes / bytearray
+      - str (file path)
+    
+    Returns structured analysis with detected components, bounding boxes,
+    CPCB category, hazard status, and price estimation.
+    """
+    if isinstance(image_input, (bytes, bytearray)):
+        pil_img = Image.open(io.BytesIO(image_input)).convert("RGB")
+    elif isinstance(image_input, str):
+        pil_img = Image.open(image_input).convert("RGB")
+    elif isinstance(image_input, Image.Image):
+        pil_img = image_input.convert("RGB")
+    else:
+        raise ValueError("Unsupported image input type")
+
+    img_w, img_h = pil_img.size
+    detected_components: List[Dict[str, Any]] = []
+    primary_item = "MIXED_EWASTE"
+    highest_conf = 0.50
+
+    # 1. Run Ultralytics YOLOv8 detection with sensitive threshold (0.15) for electronics
+    try:
+        model = get_yolo_model()
+        results = model(pil_img, conf=0.15, verbose=False)
+        
+        if results and len(results) > 0:
+            boxes = results[0].boxes
+            for box in boxes:
+                cls_idx = int(box.cls[0].item())
+                class_name = model.names.get(cls_idx, "").lower()
+                conf = float(box.conf[0].item())
+                coords = [round(c, 1) for c in box.xyxy[0].tolist()]
+
+                if class_name in YOLO_ELECTRONICS_MAP:
+                    mapped_type = YOLO_ELECTRONICS_MAP[class_name]
+                    label_name = {
+                        "SMARTPHONE": "Smartphone / Mobile Handset",
+                        "LAPTOP": "Laptop / Notebook Computer",
+                        "MONITOR_DISPLAY": "Flat Screen Monitor / Display",
+                        "PRINTED_CIRCUIT_BOARD": "Circuit Board Component",
+                        "MIXED_EWASTE": "Electronic Appliance Unit"
+                    }.get(mapped_type, class_name.title())
+
+                    detected_components.append({
+                        "label": f"Electronic Device: {label_name}",
+                        "raw_class": class_name,
+                        "e_waste_type": mapped_type,
+                        "confidence": round(conf, 3),
+                        "box_xyxy": coords
+                    })
+                    if conf > highest_conf:
+                        highest_conf = conf
+                        primary_item = mapped_type
+    except Exception as yolo_err:
+        logger.warning(f"YOLO inference notice: {yolo_err}")
+
+    # 2. Specialized E-Waste Component Heuristic Detection
+    np_img = np.array(pil_img)
+    r = np_img[:, :, 0].astype(float)
+    g = np_img[:, :, 1].astype(float)
+    b = np_img[:, :, 2].astype(float)
+    total_pixels = float(img_w * img_h)
+
+    # A. PCB Detection: Strong Green/Dark-Green soldermask predominance
+    green_mask = (g > 70) & (g > r * 1.30) & (g > b * 1.25)
+    green_pct = float(np.count_nonzero(green_mask)) / total_pixels
+    
+    # B. Copper Wire Detection: Rich orange/red-brown hue
+    copper_mask = (r > 130) & (r > g * 1.35) & (g > b * 1.1) & (b < 100)
+    copper_pct = float(np.count_nonzero(copper_mask)) / total_pixels
+
+    # C. Battery / Hazard Packaging: High-contrast yellow/black or blue shrink
+    yellow_warn_mask = (r > 180) & (g > 160) & (b < 80)
+    yellow_pct = float(np.count_nonzero(yellow_warn_mask)) / total_pixels
+
+    # D. Smartphone Form-Factor Heuristic:
+    # Aspect ratio max(dim)/min(dim) is between 1.6 and 2.4, low green PCB soldermask (< 0.05)
+    aspect = max(img_w, img_h) / max(1.0, min(img_w, img_h))
+    is_phone_geometry = (1.5 <= aspect <= 2.4) and (green_pct < 0.05) and (copper_pct < 0.04)
+
+    # If YOLO didn't lock a primary item or detected phone geometry
+    if is_phone_geometry and primary_item == "MIXED_EWASTE":
+        phone_conf = 0.91
+        detected_components.append({
+            "label": "Electronic Device: Smartphone / Mobile Handset",
+            "raw_class": "smartphone_form_factor",
+            "e_waste_type": "SMARTPHONE",
+            "confidence": phone_conf,
+            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.05), round(img_w * 0.9), round(img_h * 0.95)]
+        })
+        if phone_conf > highest_conf:
+            highest_conf = phone_conf
+            primary_item = "SMARTPHONE"
+
+    # Strict PCB detection: only trigger if actual green soldermask is present (> 12%)
+    if green_pct > 0.12:
+        conf = min(0.98, 0.75 + (green_pct * 1.5))
+        detected_components.append({
+            "label": "Electronic Component: Printed Circuit Board (PCB)",
+            "raw_class": "circuit_board",
+            "e_waste_type": "PRINTED_CIRCUIT_BOARD",
+            "confidence": round(conf, 2),
+            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)]
+        })
+        if conf > highest_conf:
+            highest_conf = conf
+            primary_item = "PRINTED_CIRCUIT_BOARD"
+
+    if copper_pct > 0.05:
+        conf = min(0.96, 0.70 + (copper_pct * 2.0))
+        detected_components.append({
+            "label": "Component: Stripped Copper Wiring & Cables",
+            "raw_class": "copper_cable",
+            "e_waste_type": "COPPER_CABLE",
+            "confidence": round(conf, 2),
+            "box_xyxy": [round(img_w * 0.15), round(img_h * 0.15), round(img_w * 0.85), round(img_h * 0.85)]
+        })
+        if conf > highest_conf:
+            highest_conf = conf
+            primary_item = "COPPER_CABLE"
+
+    if yellow_pct > 0.06:
+        conf = min(0.95, 0.65 + (yellow_pct * 2.5))
+        detected_components.append({
+            "label": "Component: Lithium-Ion / Rechargeable Battery Cell",
+            "raw_class": "battery_cell",
+            "e_waste_type": "BATTERY_LITHIUM_ION",
+            "confidence": round(conf, 2),
+            "box_xyxy": [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
+        })
+        if conf > highest_conf:
+            highest_conf = conf
+            primary_item = "BATTERY_LITHIUM_ION"
+
+    # Default fallback component if none explicitly triggered
+    if not detected_components:
+        detected_components.append({
+            "label": "General Electronic Scrap Components",
+            "raw_class": "mixed_scrap",
+            "e_waste_type": "MIXED_EWASTE",
+            "confidence": 0.80,
+            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)]
+        })
+
+    meta = CPCB_BENCHMARKS.get(primary_item, CPCB_BENCHMARKS["MIXED_EWASTE"])
+    is_hazardous = meta.get("hazardous", False)
+    
+    hazard_msg = None
+    if is_hazardous:
+        if primary_item == "SMARTPHONE":
+            hazard_msg = "CPCB HAZARD ALERT: Device contains high-density Lithium battery. Do not crush, bend, or puncture screen. Route to authorized dismantler."
+        else:
+            hazard_msg = "CPCB HAZARD ALERT: Item contains toxic heavy metals/chemicals. Do not crush, burn, or puncture. Hand over exclusively to authorized dismantler."
+
+    price_str = f"₹{meta.get('price_per_kg', 0.0):.1f}/kg" if "price_per_kg" in meta else f"₹{meta.get('price_per_unit', 0.0):.0f}/unit"
+
+    return {
+        "material_type": primary_item,
+        "category": meta["category"],
+        "confidence": round(highest_conf, 2),
+        "is_hazardous": is_hazardous,
+        "hazard_alert": hazard_msg,
+        "detected_components": detected_components,
+        "estimated_fair_price": price_str,
+        "model_version": "YOLOv8n + EcoScrap E-Waste Component Analyzer",
+        "total_components_detected": len(detected_components)
+    }

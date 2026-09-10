@@ -1,0 +1,14 @@
+.env
+*.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.db
+ecoscrap.db
+media/
+yolov8n.pt
+*.pt

@@ -12,7 +12,12 @@ from backend.app.models import (
     RiskEvent,
     UserRole,
     LotStatus,
-    BidStatus
+    BidStatus,
+    Payment,
+    PaymentStatus,
+    Collection,
+    CollectionItem,
+    CollectionStatus
 )
 from backend.app.services.passport import generate_qr_for_lot
 from backend.app.services.ledger import record_chain_event
@@ -306,6 +311,48 @@ def seed_database():
             otp_verified=False
         )
         db.add(handover2)
+
+        # Demo Payment record for Murugan
+        payment1 = Payment(
+            transaction_reference="TXN-ESCROW-2026-99214",
+            lot_id=lot2.id,
+            collector_id=col1_profile.id,
+            recycler_id=rec2_profile.id,
+            amount=6050.0,
+            currency="INR",
+            status=PaymentStatus.SETTLED,
+            payment_method="UPI Direct Escrow",
+            settlement_date=datetime.utcnow()
+        )
+        db.add(payment1)
+
+        # Demo Collection Draft for Murugan
+        col_draft = Collection(
+            collection_code="COL-TN-2026-10492",
+            collector_id=col1_profile.id,
+            source_type="household",
+            status=CollectionStatus.DRAFT,
+            total_items_count=5.0,
+            notes="Household doorstep collection"
+        )
+        db.add(col_draft)
+        db.flush()
+
+        item1 = CollectionItem(
+            collection_id=col_draft.id,
+            name="old laptop",
+            normalized_type="LAPTOP",
+            quantity=3.0,
+            unit="units"
+        )
+        item2 = CollectionItem(
+            collection_id=col_draft.id,
+            name="copper wire",
+            normalized_type="COPPER_CABLE",
+            quantity=2.0,
+            unit="bags"
+        )
+        db.add_all([item1, item2])
 
         db.commit()
         logger.info("Successfully seeded demo data for EcoScrap!")

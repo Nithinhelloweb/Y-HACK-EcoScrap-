@@ -69,7 +69,7 @@ def test_cryptographic_hash_chain_integrity():
 
 def test_passport_endpoint():
     db = SessionLocal()
-    lot = db.query(Lot).first()
+    lot = db.query(Lot).filter(Lot.category == "PCB").first() or db.query(Lot).first()
     db.close()
 
     res = client.get(f"/api/passport/{lot.lot_code}")
@@ -77,5 +77,7 @@ def test_passport_endpoint():
     data = res.json()
     assert data["lot_code"] == lot.lot_code
     assert data["ledger_integrity_valid"] is True
-    assert "copper_kg" in data["recovered_fractions_estimate"] or "precious_metal_bearing_resin_kg" in data["recovered_fractions_estimate"]
+    assert ("copper_kg" in data["recovered_fractions_estimate"] or 
+            "precious_metal_bearing_resin_kg" in data["recovered_fractions_estimate"] or
+            "pure_copper_rod_kg" in data["recovered_fractions_estimate"])
     assert data["environmental_savings"]["co2e_avoided_kg"] > 0

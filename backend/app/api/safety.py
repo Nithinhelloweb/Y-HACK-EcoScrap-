@@ -44,3 +44,13 @@ def get_all_safety_protocols():
     Returns all CPCB-aligned standard operating safety protocols in EN, TA, HI.
     """
     return SAFETY_PROTOCOLS
+
+@router.get("/safety/{material}")
+def get_material_safety_guidance(material: str, lang: str = "en"):
+    """
+    GET /api/safety/{material}
+    Returns concise safety instructions and forbidden actions for a specific material.
+    """
+    from backend.app.services.voice_engine import VoiceToolsExecutor
+    return VoiceToolsExecutor.get_safety_guidance(material, lang)
+

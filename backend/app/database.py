@@ -51,3 +51,30 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def check_db_health() -> dict:
+    """
+    Returns live health telemetry for the active database engine.
+    """
+    try:
+        with engine.connect() as conn:
+            if "postgresql" in engine.url.drivername:
+                res = conn.execute(text("SELECT current_database(), current_user, version();"))
+                row = res.fetchone()
+                return {
+                    "status": "connected",
+                    "engine": "postgresql",
+                    "database": row[0] if row else settings.POSTGRES_DB,
+                    "user": row[1] if row else settings.POSTGRES_USER,
+                    "server": f"{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}",
+                    "version": str(row[2]).split(",")[0] if row and len(row) > 2 else ""
+                }
+            else:
+                return {
+                    "status": "connected",
+                    "engine": "sqlite",
+                    "database": "sqlite_fallback",
+                    "url": settings.SQLITE_FALLBACK_URL
+                }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
