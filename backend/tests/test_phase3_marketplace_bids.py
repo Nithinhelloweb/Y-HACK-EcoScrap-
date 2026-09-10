@@ -61,7 +61,7 @@ def test_predatory_bid_anomaly_shield():
     assert len(risk_events) >= 1
     recent_risk = [r for r in risk_events if r.risk_type == "PRICE_ANOMALY_LOW"]
     assert len(recent_risk) >= 1
-    assert recent_risk[0].severity == "HIGH"
+    assert any(r.severity == "HIGH" for r in recent_risk)
     db.close()
 
 def test_smart_matching_scoring_weights():

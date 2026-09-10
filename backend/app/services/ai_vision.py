@@ -142,28 +142,53 @@ def analyze_scrap_image(
     # Geometry & visual aspect
     aspect = visual_features["aspect_ratio"]
     is_phone_aspect = (0.42 <= aspect <= 0.65) or (1.55 <= aspect <= 2.40)
-    is_smooth_surface = (visual_features["green_ratio"] < 0.30 and visual_features["copper_ratio"] < 0.25)
+    is_smooth_surface = (visual_features["green_ratio"] < 0.38 and visual_features["copper_ratio"] < 0.25)
+
+    is_mouse_context = any(k in context for k in ["mouse", "trackpad", "optical mouse", "gaming mouse", "சுட்டி", "மவுஸ்", "माउस"])
+    is_keyboard_context = any(k in context for k in ["keyboard", "keypad", "விசைப்பலகை", "कीबोर्ड"])
+    is_phone_context = any(k in context for k in [
+        "smartphone", "mobile", "cellphone", "cell phone", "phone", "handset",
+        "android", "iphone", "galaxy", "redmi", "xiaomi", "oneplus", "realme",
+        "oppo", "vivo", "pixel", "nokia", "motorola", "honor"
+    ])
 
     # ─────────────────────────────────────────────────────────────
     # MULTI-MODAL DECISION ENGINE:
     # ─────────────────────────────────────────────────────────────
 
-    # 1. SMARTPHONE / MOBILE PHONE
+    # 1. PERIPHERALS: COMPUTER MOUSE
     if (
-        ocr_hint == "SMARTPHONE" or
-        yolo_material == "SMARTPHONE" or
-        any(k in context for k in [
-            "smartphone", "mobile", "cellphone", "cell phone", "phone", "handset",
-            "android", "iphone", "galaxy", "redmi", "xiaomi", "oneplus", "realme",
-            "oppo", "vivo", "pixel", "nokia", "motorola", "honor"
-        ]) or
-        (is_phone_aspect and is_smooth_surface and "pcb" not in context and "cable" not in context)
+        is_mouse_context or
+        yolo_material == "MOUSE" or
+        (yolo_material == "KEYBOARD" and not is_keyboard_context and aspect < 2.3)
+    ):
+        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["mouse"]
+        visual_features["detected_signature"] = "COMPUTER_MOUSE_PERIPHERAL"
+        confidence = 0.95 if (is_mouse_context or yolo_material == "MOUSE") else 0.90
+
+    # 2. PERIPHERALS: KEYBOARD
+    elif (
+        is_keyboard_context or
+        (yolo_material == "KEYBOARD" and (aspect >= 2.0 or is_keyboard_context))
+    ):
+        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["keyboard"]
+        visual_features["detected_signature"] = "COMPUTER_KEYBOARD_PERIPHERAL"
+        confidence = 0.94
+
+    # 3. SMARTPHONE / MOBILE PHONE
+    elif (
+        not is_mouse_context and not is_keyboard_context and (
+            ocr_hint == "SMARTPHONE" or
+            yolo_material == "SMARTPHONE" or
+            is_phone_context or
+            (is_phone_aspect and is_smooth_surface and "pcb" not in context and "cable" not in context)
+        )
     ):
         info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["smartphone"]
         visual_features["detected_signature"] = "SMARTPHONE_HANDSET_CHASSIS"
         confidence = 0.95 if (ocr_hint == "SMARTPHONE" or yolo_material == "SMARTPHONE") else 0.91
 
-    # 2. LAPTOP / NOTEBOOK
+    # 4. LAPTOP / NOTEBOOK
     elif (
         ocr_hint == "LAPTOP" or
         yolo_material == "LAPTOP" or
@@ -173,13 +198,13 @@ def analyze_scrap_image(
         visual_features["detected_signature"] = "WHOLE_IT_EQUIPMENT_CHASSIS"
         confidence = 0.94
 
-    # 3. TABLET
+    # 5. TABLET
     elif any(k in context for k in ["tablet", "ipad", "e-reader", "kindle"]) or yolo_material == "TABLET":
         info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["tablet"]
         visual_features["detected_signature"] = "TABLET_HANDHELD_CHASSIS"
         confidence = 0.93
 
-    # 4. BATTERY (Lithium-Ion or Lead-Acid)
+    # 6. BATTERY (Lithium-Ion or Lead-Acid)
     elif (
         ocr_hint == "BATTERY" or
         yolo_material in ["BATTERY_LITHIUM_ION", "BATTERY_LEAD_ACID"] or
@@ -194,7 +219,7 @@ def analyze_scrap_image(
             visual_features["detected_signature"] = "CYLINDRICAL_OR_PRISMATIC_BATTERY_CELL"
             confidence = 0.96
 
-    # 5. COPPER CABLE & HARNESS
+    # 7. COPPER CABLE & HARNESS
     elif (
         yolo_material == "COPPER_CABLE" or
         any(k in context for k in ["wire", "cable", "copper", "cord", "harness"]) or
@@ -204,7 +229,7 @@ def analyze_scrap_image(
         visual_features["detected_signature"] = "INSULATED_COPPER_CABLE_BUNDLE"
         confidence = 0.94
 
-    # 6. DISPLAY / MONITOR
+    # 8. DISPLAY / MONITOR
     elif (
         yolo_material in ["MONITOR_DISPLAY", "CRT_DISPLAY"] or
         any(k in context for k in ["monitor", "display", "screen", "lcd", "crt", "led panel"])
@@ -218,7 +243,7 @@ def analyze_scrap_image(
             visual_features["detected_signature"] = "FLAT_SCREEN_DISPLAY_PANEL"
             confidence = 0.92
 
-    # 7. PRINTED CIRCUIT BOARD (Strictly verified PCB only)
+    # 9. PRINTED CIRCUIT BOARD (Strictly verified PCB only)
     elif (
         ocr_hint == "PRINTED_CIRCUIT_BOARD" or
         yolo_material in ["PRINTED_CIRCUIT_BOARD", "LOW_GRADE_PCB"] or
@@ -234,24 +259,13 @@ def analyze_scrap_image(
             visual_features["detected_signature"] = "HIGH_DENSITY_SURFACE_MOUNT_PCB"
             confidence = 0.95
 
-    # 8. PERIPHERALS: KEYBOARD & MOUSE
-    elif yolo_material == "KEYBOARD" or any(k in context for k in ["keyboard", "keypad"]):
-        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["keyboard"]
-        visual_features["detected_signature"] = "COMPUTER_KEYBOARD_PERIPHERAL"
-        confidence = 0.93
-
-    elif yolo_material == "MOUSE" or any(k in context for k in ["mouse", "trackpad"]):
-        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["mouse"]
-        visual_features["detected_signature"] = "COMPUTER_MOUSE_PERIPHERAL"
-        confidence = 0.92
-
-    # 9. LIGHT BULB / MERCURY LAMP
+    # 10. LIGHT BULB / MERCURY LAMP
     elif yolo_material == "LIGHT_BULB" or any(k in context for k in ["bulb", "cfl", "fluorescent", "lamp"]):
         info = MATERIAL_KNOWLEDGE_BASE["display"]["light_bulb"]
         visual_features["detected_signature"] = "FLUORESCENT_OR_LED_BULB"
         confidence = 0.94
 
-    # 10. MIXED E-WASTE / GENERAL SCRAP (No false motherboard fallback)
+    # 11. MIXED E-WASTE / GENERAL SCRAP (No false fallback)
     else:
         info = MATERIAL_KNOWLEDGE_BASE["mixed"]["mixed_ewaste"]
         visual_features["detected_signature"] = "GENERAL_ELECTRONIC_SCRAP"
@@ -305,6 +319,19 @@ def analyze_scrap_image(
             "copper_circuitry_pct": 14.0,
             "abs_plastics_pct": 10.0
         }
+    elif category == "IT_EQUIPMENT" and "MOUSE" in subcategory:
+        composition = {
+            "abs_plastics_pct": 65.0,
+            "internal_pcb_pct": 20.0,
+            "copper_wiring_pct": 10.0,
+            "rubber_wheel_pct": 5.0
+        }
+    elif category == "IT_EQUIPMENT" and "KEYBOARD" in subcategory:
+        composition = {
+            "abs_plastics_pct": 72.0,
+            "membrane_circuit_pct": 16.0,
+            "copper_cable_pct": 12.0
+        }
     elif category == "IT_EQUIPMENT":
         composition = {
             "aluminium_casing_pct": 38.0,
@@ -321,8 +348,18 @@ def analyze_scrap_image(
         }
 
     # Automatically compute fair market value estimate
-    # Smartphones default weight: 0.25 kg / unit; Laptops: 2.2 kg; PCBs: 1.5 kg
-    default_weight = 0.25 if "SMARTPHONE" in subcategory else (2.2 if "LAPTOP" in subcategory else 5.0)
+    # Mouse: ~0.15 kg, Keyboard: ~0.6 kg, Smartphones: ~0.25 kg, Laptops: ~2.2 kg
+    if "MOUSE" in subcategory:
+        default_weight = 0.15
+    elif "KEYBOARD" in subcategory:
+        default_weight = 0.60
+    elif "SMARTPHONE" in subcategory:
+        default_weight = 0.25
+    elif "LAPTOP" in subcategory:
+        default_weight = 2.20
+    else:
+        default_weight = 5.0
+
     fair_value = calculate_fair_value(
         category=category,
         subcategory=subcategory,
@@ -344,6 +381,7 @@ def analyze_scrap_image(
         "safety_flags": safety_flags,
         "safety_guidance": info["safety_guidance"],
         "estimated_base_rate_per_kg": info["base_rate"],
+        "base_rate": info["base_rate"],
         "recommended_action": info["recommended_action"],
         "visual_features": visual_features,
         "composition_breakdown": composition,

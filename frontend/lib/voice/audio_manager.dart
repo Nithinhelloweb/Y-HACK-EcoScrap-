@@ -11,11 +11,13 @@ class AudioManager with ChangeNotifier {
   Timer? _levelSimulatorTimer;
 
   String _currentTranscript = '';
+  Uint8List? _lastRecordedAudioBytes;
 
   bool get isRecording => _isRecording;
   bool get isPlaying => _isPlaying;
   double get currentVolume => _currentVolume;
   String get currentTranscript => _currentTranscript;
+  Uint8List? get lastRecordedAudioBytes => _lastRecordedAudioBytes;
 
   /// Starts listening / recording audio stream with live speech-to-text.
   void startRecording({
@@ -26,7 +28,21 @@ class AudioManager with ChangeNotifier {
     _isRecording = true;
     _isPlaying = false;
     _currentTranscript = '';
+    _lastRecordedAudioBytes = null;
     _startSimulatedLevel(onAudioLevel);
+
+    // Real hardware microphone capture with Web Audio API analyser
+    platformStartAudioRecording(
+      onAudioLevel: (level) {
+        _stopSimulatedLevel();
+        _currentVolume = level;
+        onAudioLevel?.call(level);
+        notifyListeners();
+      },
+      onError: (err) {
+        debugPrint('Audio recording error: $err');
+      },
+    );
 
     platformStartSpeechRecognition(
       language: language,
@@ -47,9 +63,16 @@ class AudioManager with ChangeNotifier {
   }
 
   /// Stops recording audio and returns the final captured transcript.
-  String stopRecording() {
+  Future<String> stopRecording() async {
     _isRecording = false;
     _stopSimulatedLevel();
+
+    try {
+      _lastRecordedAudioBytes = await platformStopAudioRecording();
+    } catch (e) {
+      debugPrint('platformStopAudioRecording error: $e');
+    }
+
     final finalText = platformStopSpeechRecognition();
     if (finalText.isNotEmpty) {
       _currentTranscript = finalText;

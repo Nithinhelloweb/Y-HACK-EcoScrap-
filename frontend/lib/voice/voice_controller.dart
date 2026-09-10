@@ -115,16 +115,44 @@ class VoiceController with ChangeNotifier {
 
   /// Release Push-To-Talk: Send captured speech
   Future<void> onMicRelease({String? spokenTranscript}) async {
-    final captured = audioManager.stopRecording();
     _state = _state.copyWith(
       status: VoiceStatus.processing,
       audioLevel: 0.0,
+      liveTranscription: 'Processing speech...',
     );
     notifyListeners();
 
+    final captured = await audioManager.stopRecording();
+
     String text = (spokenTranscript ?? (captured.isNotEmpty ? captured : _state.liveTranscription)).trim();
-    if (text == 'Listening... (Speak now)' || text == 'Listening...') {
+    if (text == 'Listening... (Speak now)' || text == 'Listening...' || text == 'Processing speech...') {
       text = captured.trim();
+    }
+
+    // High-accuracy Local Whisper AI fallback:
+    // If browser speech recognition failed to capture text, but raw audio bytes were recorded:
+    if (text.isEmpty &&
+        audioManager.lastRecordedAudioBytes != null &&
+        audioManager.lastRecordedAudioBytes!.isNotEmpty) {
+      _state = _state.copyWith(
+        status: VoiceStatus.processing,
+        liveTranscription: 'Transcribing speech with Whisper AI...',
+      );
+      notifyListeners();
+
+      try {
+        final whisperRes = await voiceService.transcribeAudio(
+          audioManager.lastRecordedAudioBytes!,
+          filename: 'recording.webm',
+          languageHint: _selectedLanguage,
+        );
+        final transcribedText = (whisperRes['text'] as String? ?? '').trim();
+        if (transcribedText.isNotEmpty) {
+          text = transcribedText;
+        }
+      } catch (e) {
+        debugPrint('Whisper transcription fallback error: $e');
+      }
     }
 
     if (text.isEmpty) {

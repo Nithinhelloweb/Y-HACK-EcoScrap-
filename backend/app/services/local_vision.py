@@ -139,6 +139,17 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
 
                 if class_name in YOLO_ELECTRONICS_MAP:
                     mapped_type = YOLO_ELECTRONICS_MAP[class_name]
+                    
+                    # Disambiguate Computer Mouse vs Keyboard vs Smartphone:
+                    # Keyboards are wide/elongated (aspect ratio >= 2.4). Handheld compact peripherals are Computer Mice.
+                    bw = max(1.0, coords[2] - coords[0])
+                    bh = max(1.0, coords[3] - coords[1])
+                    box_aspect = max(bw, bh) / min(bw, bh)
+                    if mapped_type == "KEYBOARD" and box_aspect < 2.3:
+                        mapped_type = "MOUSE"
+                    elif mapped_type == "SMARTPHONE" and box_aspect < 1.55:
+                        mapped_type = "MOUSE"
+
                     label_name = {
                         "SMARTPHONE": "Mobile / Smartphone Handset",
                         "PRINTED_CIRCUIT_BOARD": "Circuit Board (PCB)",
@@ -185,24 +196,29 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
     yellow_warn_mask = (r > 180) & (g > 160) & (b < 80)
     yellow_pct = float(np.count_nonzero(yellow_warn_mask)) / total_pixels
 
-    # D. Smartphone Form-Factor Heuristic:
-    # Aspect ratio max(dim)/min(dim) is between 1.6 and 2.4, low green PCB soldermask (< 0.05)
-    aspect = max(img_w, img_h) / max(1.0, min(img_w, img_h))
-    is_phone_geometry = (1.5 <= aspect <= 2.4) and (green_pct < 0.05) and (copper_pct < 0.04)
-
-    # If YOLO didn't lock a primary item or detected phone geometry
-    if is_phone_geometry and primary_item == "MIXED_EWASTE":
-        phone_conf = 0.91
-        detected_components.append({
-            "label": "Electronic Device: Smartphone / Mobile Handset",
-            "raw_class": "smartphone_form_factor",
-            "e_waste_type": "SMARTPHONE",
-            "confidence": phone_conf,
-            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.05), round(img_w * 0.9), round(img_h * 0.95)]
-        })
-        if phone_conf > highest_conf:
-            highest_conf = phone_conf
-            primary_item = "SMARTPHONE"
+    # D. Handheld Device Aspect & Peripheral Heuristic:
+    # Check for compact mouse/peripheral characteristics vs elongated phone only when relevant
+    # Avoid classifying full 16:9 webcam canvas as a phone.
+    if primary_item == "MIXED_EWASTE" and highest_conf < 0.60:
+        dark_matte_mask = (r < 75) & (g < 75) & (b < 75)
+        dark_matte_pct = float(np.count_nonzero(dark_matte_mask)) / total_pixels
+        # If image contains a compact centered dark peripheral object (mouse/accessory)
+        if 0.08 < dark_matte_pct < 0.65 and green_pct < 0.05 and copper_pct < 0.03:
+            # Check if there is high curvature or compact ratio in center
+            center_crop = np_img[int(img_h * 0.25):int(img_h * 0.75), int(img_w * 0.25):int(img_w * 0.75)]
+            c_r, c_g, c_b = center_crop[:, :, 0], center_crop[:, :, 1], center_crop[:, :, 2]
+            # If center has glowing LED or optical sensor (e.g. yellow or red glow)
+            sensor_glow = (c_r > 120) & (c_g > 100) & (c_b < 80)
+            if np.count_nonzero(sensor_glow) > 15:
+                detected_components.append({
+                    "label": "E-Waste: Computer Mouse Peripheral",
+                    "raw_class": "optical_mouse_sensor",
+                    "e_waste_type": "MOUSE",
+                    "confidence": 0.88,
+                    "box_xyxy": [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
+                })
+                highest_conf = 0.88
+                primary_item = "MOUSE"
 
     # Strict PCB detection: only trigger if actual green soldermask is present (> 12%)
     if green_pct > 0.12:

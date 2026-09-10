@@ -17,6 +17,17 @@ String platformStopSpeechRecognition() {
   return '';
 }
 
+Future<void> platformStartAudioRecording({
+  Function(double level)? onAudioLevel,
+  Function(String error)? onError,
+}) async {
+  // Stub
+}
+
+Future<Uint8List?> platformStopAudioRecording() async {
+  return null;
+}
+
 void platformSpeak({
   required String text,
   required String language,
