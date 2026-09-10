@@ -88,6 +88,26 @@ MATERIAL_KNOWLEDGE_BASE = {
             "safety_flags": ["INTERNAL_BATTERY_PRESENT"],
             "safety_guidance": "Do not dismantle without proper ventilation. Ensure battery is checked for swelling before stacking.",
             "recommended_action": "Offer as complete unit or separate motherboard and battery for higher margin."
+        },
+        "keyboard": {
+            "category": "IT_EQUIPMENT",
+            "subcategory": "KEYBOARD_PERIPHERAL",
+            "item_name": "Computer Keyboard Input Device",
+            "grade": "Tier 3 Peripheral Electronics",
+            "base_rate": 160.0,
+            "safety_flags": ["PLASTIC_AND_MEMBRANE_RECOVERY"],
+            "safety_guidance": "Mechanical disassembly to recover ABS plastic housing and internal membrane circuit.",
+            "recommended_action": "Bundle with electronic peripherals for plastic casing and membrane recovery."
+        },
+        "mouse": {
+            "category": "IT_EQUIPMENT",
+            "subcategory": "MOUSE_PERIPHERAL",
+            "item_name": "Optical / USB Computer Mouse",
+            "grade": "Tier 3 Peripheral Electronics",
+            "base_rate": 140.0,
+            "safety_flags": ["OPTICAL_SENSOR_PLASTIC"],
+            "safety_guidance": "Disassemble for ABS plastic casing and small optical sensor circuit board.",
+            "recommended_action": "Bundle with miscellaneous small IT accessories."
         }
     },
     "display": {
@@ -110,6 +130,16 @@ MATERIAL_KNOWLEDGE_BASE = {
             "safety_flags": ["TOXIC_LEAD_PHOSPHOR_HAZARD", "IMPLOSION_RISK_UNDER_VACUUM"],
             "safety_guidance": "CRITICAL HAZARD: Do not crack or puncture the vacuum neck. Never dispose in general waste.",
             "recommended_action": "Requires specialized CPCB mechanical glass separation facility."
+        },
+        "light_bulb": {
+            "category": "DISPLAY",
+            "subcategory": "LIGHT_BULB_FLUORESCENT",
+            "item_name": "Fluorescent / CFL / LED Light Bulb",
+            "grade": "Hazardous Glass & Mercury Waste",
+            "base_rate": 40.0,
+            "safety_flags": ["MERCURY_VAPOR_HAZARD", "FRAGILE_GLASS_HAZARD"],
+            "safety_guidance": "CRITICAL HAZARD: Do not break or crush bulb. Mercury vapor is toxic. Store in original carton or padded sleeve.",
+            "recommended_action": "Requires specialized mercury extraction and glass recycling facility."
         }
     },
     "mixed": {

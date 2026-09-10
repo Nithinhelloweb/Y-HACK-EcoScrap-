@@ -14,7 +14,7 @@ _yolo_model = None
 
 # CPCB Price benchmarks (INR)
 CPCB_BENCHMARKS = {
-    "SMARTPHONE": {"category": "ITEW", "price_per_unit": 650.0, "price_per_kg": 850.0, "hazardous": True},
+    "SMARTPHONE": {"category": "ITEW", "price_per_unit": 850.0, "price_per_kg": 850.0, "hazardous": True},
     "TABLET": {"category": "ITEW", "price_per_unit": 850.0, "price_per_kg": 620.0, "hazardous": True},
     "LAPTOP": {"category": "ITEW", "price_per_unit": 1850.0, "price_per_kg": 480.0, "hazardous": False},
     "PRINTED_CIRCUIT_BOARD": {"category": "ITEW", "price_per_kg": 550.0, "hazardous": False},
@@ -24,25 +24,43 @@ CPCB_BENCHMARKS = {
     "COPPER_CABLE": {"category": "CEEW", "price_per_kg": 420.0, "hazardous": False},
     "MONITOR_DISPLAY": {"category": "ITEW", "price_per_unit": 380.0, "price_per_kg": 140.0, "hazardous": True},
     "CRT_DISPLAY": {"category": "ITEW", "price_per_unit": 200.0, "price_per_kg": 65.0, "hazardous": True},
+    "KEYBOARD": {"category": "ITEW", "price_per_kg": 160.0, "hazardous": False},
+    "MOUSE": {"category": "ITEW", "price_per_kg": 140.0, "hazardous": False},
+    "LIGHT_BULB": {"category": "HAZARDOUS_COMPONENTS", "price_per_kg": 40.0, "hazardous": True},
     "CAPACITORS_TRANSFORMERS": {"category": "CEEW", "price_per_kg": 160.0, "hazardous": False},
     "MIXED_EWASTE": {"category": "CEEW", "price_per_kg": 110.0, "hazardous": False}
 }
 
-# Electronics mappings from standard YOLO classes
+# Electronics & e-waste mappings from fine-tuned E-Waste YOLO model + legacy COCO classes
 YOLO_ELECTRONICS_MAP = {
+    # Fine-Tuned E-Waste Model (EWaste_Final_Model) classes:
+    "mobile": "SMARTPHONE",
+    "pcb": "PRINTED_CIRCUIT_BOARD",
+    "battery_waste": "BATTERY_LITHIUM_ION",
+    "keyboard": "KEYBOARD",
+    "mouse": "MOUSE",
+    "light_bulb": "LIGHT_BULB",
+    "glass_waste": "MONITOR_DISPLAY",
+    "metal_waste": "COPPER_CABLE",
+    "plastic_waste": "MIXED_EWASTE",
+    "medical_waste": "HAZARDOUS_COMPONENTS",
+    "organic_waste": "MIXED_EWASTE",
+    "paper_waste": "MIXED_EWASTE",
+
+    # Standard COCO fallbacks:
     "cell phone": "SMARTPHONE",
     "laptop": "LAPTOP",
     "tv": "MONITOR_DISPLAY",
-    "keyboard": "PRINTED_CIRCUIT_BOARD",
-    "mouse": "PRINTED_CIRCUIT_BOARD",
+    "remote": "SMARTPHONE",
+    "circuit_board": "PRINTED_CIRCUIT_BOARD",
     "microwave": "MIXED_EWASTE",
     "refrigerator": "MIXED_EWASTE",
-    "remote": "SMARTPHONE"
 }
 
 def get_yolo_model():
     """
-    Returns the loaded Ultralytics YOLOv8 instance (singleton).
+    Returns the loaded Ultralytics YOLO instance (singleton).
+    Prioritizes the fine-tuned E-Waste model extracted from EWaste_Final_Model.zip.
     Thread-safe.
     """
     global _yolo_model
@@ -51,30 +69,37 @@ def get_yolo_model():
             if _yolo_model is None:
                 try:
                     from ultralytics import YOLO
-                    # Check backend directory or root directory for weights
+                    fine_tuned_path = os.path.abspath(
+                        os.path.join(os.path.dirname(__file__), "..", "..", "models", "ewaste_detector", "best.pt")
+                    )
                     candidates = [
+                        os.getenv("EWASTE_MODEL_PATH", ""),
                         os.getenv("YOLO_WEIGHTS_PATH", ""),
-                        "yolov8n.pt",
+                        fine_tuned_path,
+                        "backend/models/ewaste_detector/best.pt",
+                        "models/ewaste_detector/best.pt",
+                        "backend/best.pt",
+                        "best.pt",
                         "backend/yolov8n.pt",
-                        os.path.join(os.path.dirname(__file__), "..", "..", "yolov8n.pt")
+                        "yolov8n.pt",
                     ]
-                    weights_path = "yolov8n.pt"
+                    weights_path = fine_tuned_path if os.path.exists(fine_tuned_path) else "yolov8n.pt"
                     for c in candidates:
                         if c and os.path.exists(c):
                             weights_path = c
                             break
 
-                    logger.info(f"Loading local YOLO model: {weights_path}")
+                    logger.info(f"Loading Fine-Tuned E-Waste YOLO model: {weights_path}")
                     _yolo_model = YOLO(weights_path)
-                    logger.info("Local YOLO model loaded successfully.")
+                    logger.info(f"Fine-Tuned E-Waste YOLO model loaded successfully with {_yolo_model.names}.")
                 except Exception as e:
-                    logger.error(f"Failed to load YOLO model: {e}")
+                    logger.error(f"Failed to load fine-tuned YOLO model: {e}")
                     raise
     return _yolo_model
 
 def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
     """
-    Runs local YOLOv8 neural detection combined with specialized electronic component
+    Runs fine-tuned E-Waste YOLO neural detection combined with specialized electronic component
     color, aspect ratio, and texture heuristics.
     
     Accepts:
@@ -99,7 +124,7 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
     primary_item = "MIXED_EWASTE"
     highest_conf = 0.50
 
-    # 1. Run Ultralytics YOLOv8 detection with sensitive threshold (0.15) for electronics
+    # 1. Run Ultralytics YOLO detection with fine-tuned e-waste model
     try:
         model = get_yolo_model()
         results = model(pil_img, conf=0.15, verbose=False)
@@ -115,15 +140,21 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
                 if class_name in YOLO_ELECTRONICS_MAP:
                     mapped_type = YOLO_ELECTRONICS_MAP[class_name]
                     label_name = {
-                        "SMARTPHONE": "Smartphone / Mobile Handset",
+                        "SMARTPHONE": "Mobile / Smartphone Handset",
+                        "PRINTED_CIRCUIT_BOARD": "Circuit Board (PCB)",
+                        "BATTERY_LITHIUM_ION": "Battery Waste Cell / Pack (Hazardous)",
+                        "KEYBOARD": "Computer Keyboard Input Device",
+                        "MOUSE": "Computer Mouse Peripheral",
+                        "LIGHT_BULB": "Light Bulb / Mercury Lamp (Hazardous)",
+                        "MONITOR_DISPLAY": "Display Glass / Monitor Screen",
+                        "COPPER_CABLE": "Metal Scrap / Copper Wiring",
                         "LAPTOP": "Laptop / Notebook Computer",
-                        "MONITOR_DISPLAY": "Flat Screen Monitor / Display",
-                        "PRINTED_CIRCUIT_BOARD": "Circuit Board Component",
-                        "MIXED_EWASTE": "Electronic Appliance Unit"
-                    }.get(mapped_type, class_name.title())
+                        "HAZARDOUS_COMPONENTS": "Hazardous Electronic / Medical Waste",
+                        "MIXED_EWASTE": "Electronic Appliance / Mixed Scrap"
+                    }.get(mapped_type, class_name.replace("_", " ").title())
 
                     detected_components.append({
-                        "label": f"Electronic Device: {label_name}",
+                        "label": f"E-Waste: {label_name}",
                         "raw_class": class_name,
                         "e_waste_type": mapped_type,
                         "confidence": round(conf, 3),
@@ -243,6 +274,6 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
         "hazard_alert": hazard_msg,
         "detected_components": detected_components,
         "estimated_fair_price": price_str,
-        "model_version": "YOLOv8n + EcoScrap E-Waste Component Analyzer",
+        "model_version": "Fine-Tuned E-Waste YOLO (EWaste_Final_Model) + Multi-Modal Analyzer",
         "total_components_detected": len(detected_components)
     }

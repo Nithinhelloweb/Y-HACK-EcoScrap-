@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 12
+names: ['Battery_Waste', 'Glass_Waste', 'Keyboard', 'Light_Bulb', 'Medical_Waste', 'Metal_Waste', 'Mobile', 'Mouse', 'Organic_Waste', 'PCB', 'Paper_Waste', 'Plastic_Waste']
+
+roboflow:
+  workspace: azizul-abedin-azmi-uwbiw
+  project: e-waste-uvzkj
+  version: 5
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/azizul-abedin-azmi-uwbiw/e-waste-uvzkj/dataset/5

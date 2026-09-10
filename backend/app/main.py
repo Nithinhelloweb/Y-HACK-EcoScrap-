@@ -33,11 +33,11 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Checking and seeding demo records...")
     seed_database()
-    # Pre-warm local Whisper and YOLO component models for instant responses
+    # Pre-warm local Whisper and Fine-Tuned E-Waste YOLO models for instant responses
     try:
         get_whisper_model()
         get_yolo_model()
-        logger.info("Local Whisper and YOLO models successfully pre-warmed.")
+        logger.info("Local Whisper and Fine-Tuned E-Waste YOLO models successfully pre-warmed.")
     except Exception as m_err:
         logger.warning(f"Model pre-warm note: {m_err}")
     yield

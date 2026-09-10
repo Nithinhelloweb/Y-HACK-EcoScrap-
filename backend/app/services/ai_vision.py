@@ -234,7 +234,24 @@ def analyze_scrap_image(
             visual_features["detected_signature"] = "HIGH_DENSITY_SURFACE_MOUNT_PCB"
             confidence = 0.95
 
-    # 8. MIXED E-WASTE / GENERAL SCRAP (No false motherboard fallback)
+    # 8. PERIPHERALS: KEYBOARD & MOUSE
+    elif yolo_material == "KEYBOARD" or any(k in context for k in ["keyboard", "keypad"]):
+        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["keyboard"]
+        visual_features["detected_signature"] = "COMPUTER_KEYBOARD_PERIPHERAL"
+        confidence = 0.93
+
+    elif yolo_material == "MOUSE" or any(k in context for k in ["mouse", "trackpad"]):
+        info = MATERIAL_KNOWLEDGE_BASE["it_equipment"]["mouse"]
+        visual_features["detected_signature"] = "COMPUTER_MOUSE_PERIPHERAL"
+        confidence = 0.92
+
+    # 9. LIGHT BULB / MERCURY LAMP
+    elif yolo_material == "LIGHT_BULB" or any(k in context for k in ["bulb", "cfl", "fluorescent", "lamp"]):
+        info = MATERIAL_KNOWLEDGE_BASE["display"]["light_bulb"]
+        visual_features["detected_signature"] = "FLUORESCENT_OR_LED_BULB"
+        confidence = 0.94
+
+    # 10. MIXED E-WASTE / GENERAL SCRAP (No false motherboard fallback)
     else:
         info = MATERIAL_KNOWLEDGE_BASE["mixed"]["mixed_ewaste"]
         visual_features["detected_signature"] = "GENERAL_ELECTRONIC_SCRAP"
