@@ -75,6 +75,72 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> submitDetectionFeedback({
+    String? imageBase64,
+    String? originalItemName,
+    String? originalCategory,
+    String? originalSubcategory,
+    required String correctedItemName,
+    required String correctedCategory,
+    required String correctedSubcategory,
+    double? correctedWeightKg,
+    double? correctedQuantity,
+    String? correctedCondition,
+    List<double>? boundingBox,
+    String? collectorId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/ai/edit-feedback');
+    final payload = <String, dynamic>{
+      'corrected_item_name': correctedItemName,
+      'corrected_category': correctedCategory,
+      'corrected_subcategory': correctedSubcategory,
+    };
+    if (imageBase64 != null) payload['image_base64'] = imageBase64;
+    if (originalItemName != null) payload['original_item_name'] = originalItemName;
+    if (originalCategory != null) payload['original_category'] = originalCategory;
+    if (originalSubcategory != null) payload['original_subcategory'] = originalSubcategory;
+    if (correctedWeightKg != null) payload['corrected_weight_kg'] = correctedWeightKg;
+    if (correctedQuantity != null) payload['corrected_quantity'] = correctedQuantity;
+    if (correctedCondition != null) payload['corrected_condition'] = correctedCondition;
+    if (boundingBox != null) payload['bounding_box'] = boundingBox;
+    if (collectorId != null) payload['collector_id'] = collectorId;
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Feedback submission failed: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSelfTrainingStatus() async {
+    final uri = Uri.parse('$baseUrl/ai/self-train/status');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch self-training status: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> triggerSelfTraining({int epochs = 5}) async {
+    final uri = Uri.parse('$baseUrl/ai/self-train');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'epochs': epochs}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to trigger self-training: ${response.body}');
+    }
+  }
+
   Future<Map<String, dynamic>> createCollectionDraft({
     required String collectorId,
     required List<Map<String, dynamic>> items,

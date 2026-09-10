@@ -94,6 +94,8 @@ class MaterialClassifyResponse(BaseModel):
     extracted_models: Optional[List[str]] = None
     hazard_keywords: Optional[List[str]] = None
     ocr_confidence: Optional[float] = None
+    estimated_weight_kg: Optional[float] = 1.0
+    quantity: Optional[float] = 1.0
 
 class OCRResponse(BaseModel):
     detected_text: str
@@ -104,6 +106,40 @@ class OCRResponse(BaseModel):
     ocr_confidence: float
     total_words_detected: int
     text_snippets: Optional[List[Dict[str, Any]]] = None
+
+# ----------------- Active Learning & Self-Training -----------------
+class DetectionEditFeedback(BaseModel):
+    image_base64: Optional[str] = None
+    original_item_name: Optional[str] = None
+    original_category: Optional[str] = None
+    original_subcategory: Optional[str] = None
+    corrected_item_name: str
+    corrected_category: str
+    corrected_subcategory: str
+    corrected_weight_kg: Optional[float] = None
+    corrected_quantity: Optional[float] = 1.0
+    corrected_condition: Optional[str] = "mixed"
+    bounding_box: Optional[List[float]] = None  # [x1, y1, x2, y2]
+    collector_id: Optional[str] = None
+
+class DetectionEditResponse(BaseModel):
+    status: str
+    message: str
+    sample_id: str
+    total_training_samples: int
+
+class SelfTrainingTriggerRequest(BaseModel):
+    epochs: Optional[int] = 5
+    batch_size: Optional[int] = 4
+    imgsz: Optional[int] = 416
+
+class SelfTrainingStatusResponse(BaseModel):
+    status: str  # IDLE, TRAINING, COMPLETED, ERROR
+    current_model_version: str
+    base_model_classes: List[str]
+    total_samples: int
+    last_trained_at: Optional[str] = None
+    metrics: Dict[str, Any] = {}
 
 # ----------------- Fair Value & Pricing -----------------
 class PriceFactor(BaseModel):

@@ -5,12 +5,21 @@ from backend.app.schemas import (
     MaterialClassifyResponse,
     PriceEstimateRequest,
     PriceEstimateResponse,
-    OCRResponse
+    OCRResponse,
+    DetectionEditFeedback,
+    DetectionEditResponse,
+    SelfTrainingTriggerRequest,
+    SelfTrainingStatusResponse
 )
 from backend.app.services.ai_lens import classify_material_input
 from backend.app.services.ai_vision import analyze_scrap_image
 from backend.app.services.fair_value import calculate_fair_value
 from backend.app.services.local_ocr import extract_text_and_entities
+from backend.app.services.self_training import (
+    record_detection_feedback,
+    get_self_training_status,
+    run_self_training
+)
 
 router = APIRouter(prefix="/ai", tags=["AI Lens & Fair Value Engine"])
 
@@ -98,4 +107,51 @@ async def extract_image_text(
             image_bytes = b""
 
     return extract_text_and_entities(image_bytes)
+ 
+
+@router.post("/edit-feedback", response_model=DetectionEditResponse)
+def submit_detection_feedback(feedback: DetectionEditFeedback):
+    """
+    Active Learning Feedback Endpoint:
+    Records user corrections (e.g. corrected category, subcategory, weight, and bounding box)
+    and saves the sample into the local training dataset for continuous self-training.
+    """
+    res = record_detection_feedback(
+        image_base64=feedback.image_base64,
+        original_item_name=feedback.original_item_name,
+        original_category=feedback.original_category,
+        original_subcategory=feedback.original_subcategory,
+        corrected_item_name=feedback.corrected_item_name,
+        corrected_category=feedback.corrected_category,
+        corrected_subcategory=feedback.corrected_subcategory,
+        corrected_weight_kg=feedback.corrected_weight_kg,
+        corrected_quantity=feedback.corrected_quantity,
+        corrected_condition=feedback.corrected_condition,
+        bounding_box=feedback.bounding_box,
+        collector_id=feedback.collector_id,
+    )
+    return res
+
+
+@router.post("/self-train")
+def trigger_self_training(req: SelfTrainingTriggerRequest):
+    """
+    Triggers local background self-training / incremental fine-tuning
+    of the e-waste YOLO model using the latest feedback dataset.
+    """
+    return run_self_training(
+        epochs=req.epochs or 5,
+        batch_size=req.batch_size or 4,
+        imgsz=req.imgsz or 416
+    )
+
+
+@router.get("/self-train/status", response_model=SelfTrainingStatusResponse)
+def get_training_status():
+    """
+    Returns the live status, dataset sample count, and validation metrics
+    of the local self-training engine.
+    """
+    return get_self_training_status()
+
 

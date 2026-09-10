@@ -169,7 +169,13 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
                         "raw_class": class_name,
                         "e_waste_type": mapped_type,
                         "confidence": round(conf, 3),
-                        "box_xyxy": coords
+                        "box_xyxy": coords,
+                        "normalized_box": [
+                            round(coords[0] / max(img_w, 1), 4),
+                            round(coords[1] / max(img_h, 1), 4),
+                            round(coords[2] / max(img_w, 1), 4),
+                            round(coords[3] / max(img_h, 1), 4)
+                        ]
                     })
                     if conf > highest_conf:
                         highest_conf = conf
@@ -210,12 +216,14 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
             # If center has glowing LED or optical sensor (e.g. yellow or red glow)
             sensor_glow = (c_r > 120) & (c_g > 100) & (c_b < 80)
             if np.count_nonzero(sensor_glow) > 15:
+                box_coords = [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
                 detected_components.append({
                     "label": "E-Waste: Computer Mouse Peripheral",
                     "raw_class": "optical_mouse_sensor",
                     "e_waste_type": "MOUSE",
                     "confidence": 0.88,
-                    "box_xyxy": [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
+                    "box_xyxy": box_coords,
+                    "normalized_box": [0.2, 0.2, 0.8, 0.8]
                 })
                 highest_conf = 0.88
                 primary_item = "MOUSE"
@@ -223,12 +231,14 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
     # Strict PCB detection: only trigger if actual green soldermask is present (> 12%)
     if green_pct > 0.12:
         conf = min(0.98, 0.75 + (green_pct * 1.5))
+        box_coords = [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)]
         detected_components.append({
             "label": "Electronic Component: Printed Circuit Board (PCB)",
             "raw_class": "circuit_board",
             "e_waste_type": "PRINTED_CIRCUIT_BOARD",
             "confidence": round(conf, 2),
-            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)]
+            "box_xyxy": box_coords,
+            "normalized_box": [0.1, 0.1, 0.9, 0.9]
         })
         if conf > highest_conf:
             highest_conf = conf
@@ -236,12 +246,14 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
 
     if copper_pct > 0.05:
         conf = min(0.96, 0.70 + (copper_pct * 2.0))
+        box_coords = [round(img_w * 0.15), round(img_h * 0.15), round(img_w * 0.85), round(img_h * 0.85)]
         detected_components.append({
             "label": "Component: Stripped Copper Wiring & Cables",
             "raw_class": "copper_cable",
             "e_waste_type": "COPPER_CABLE",
             "confidence": round(conf, 2),
-            "box_xyxy": [round(img_w * 0.15), round(img_h * 0.15), round(img_w * 0.85), round(img_h * 0.85)]
+            "box_xyxy": box_coords,
+            "normalized_box": [0.15, 0.15, 0.85, 0.85]
         })
         if conf > highest_conf:
             highest_conf = conf
@@ -249,12 +261,14 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
 
     if yellow_pct > 0.06:
         conf = min(0.95, 0.65 + (yellow_pct * 2.5))
+        box_coords = [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
         detected_components.append({
             "label": "Component: Lithium-Ion / Rechargeable Battery Cell",
             "raw_class": "battery_cell",
             "e_waste_type": "BATTERY_LITHIUM_ION",
             "confidence": round(conf, 2),
-            "box_xyxy": [round(img_w * 0.2), round(img_h * 0.2), round(img_w * 0.8), round(img_h * 0.8)]
+            "box_xyxy": box_coords,
+            "normalized_box": [0.2, 0.2, 0.8, 0.8]
         })
         if conf > highest_conf:
             highest_conf = conf
@@ -267,7 +281,8 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
             "raw_class": "mixed_scrap",
             "e_waste_type": "MIXED_EWASTE",
             "confidence": 0.80,
-            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)]
+            "box_xyxy": [round(img_w * 0.1), round(img_h * 0.1), round(img_w * 0.9), round(img_h * 0.9)],
+            "normalized_box": [0.1, 0.1, 0.9, 0.9]
         })
 
     meta = CPCB_BENCHMARKS.get(primary_item, CPCB_BENCHMARKS["MIXED_EWASTE"])

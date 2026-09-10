@@ -393,5 +393,7 @@ def analyze_scrap_image(
         "extracted_brands": ocr_result.get("extracted_brands", []),
         "extracted_models": ocr_result.get("extracted_models", []),
         "hazard_keywords": ocr_result.get("hazard_keywords", []),
-        "ocr_confidence": ocr_result.get("ocr_confidence", 0.0)
+        "ocr_confidence": ocr_result.get("ocr_confidence", 0.0),
+        "estimated_weight_kg": default_weight,
+        "quantity": 1.0,
     }

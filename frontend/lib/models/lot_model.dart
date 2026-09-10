@@ -39,6 +39,8 @@ class AIClassifyResult {
   final List<String> extractedModels;
   final List<String> hazardKeywords;
   final double ocrConfidence;
+  final double estimatedWeightKg;
+  final double quantity;
 
   AIClassifyResult({
     required this.category,
@@ -61,9 +63,15 @@ class AIClassifyResult {
     this.extractedModels = const [],
     this.hazardKeywords = const [],
     this.ocrConfidence = 0.0,
+    this.estimatedWeightKg = 1.0,
+    this.quantity = 1.0,
   });
 
   factory AIClassifyResult.fromJson(Map<String, dynamic> json) {
+    double initWeight = (json['estimated_weight_kg'] as num?)?.toDouble() ?? 1.0;
+    if (json['fair_value_estimate'] != null && json['fair_value_estimate']['weight_kg'] != null) {
+      initWeight = (json['fair_value_estimate']['weight_kg'] as num).toDouble();
+    }
     return AIClassifyResult(
       category: json['category'] ?? 'PCB',
       subcategory: json['subcategory'] ?? 'IT_HIGH_GRADE_PCB',
@@ -85,7 +93,86 @@ class AIClassifyResult {
       extractedModels: List<String>.from(json['extracted_models'] ?? []),
       hazardKeywords: List<String>.from(json['hazard_keywords'] ?? []),
       ocrConfidence: (json['ocr_confidence'] as num?)?.toDouble() ?? 0.0,
+      estimatedWeightKg: initWeight,
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
     );
+  }
+
+  AIClassifyResult copyWith({
+    String? category,
+    String? subcategory,
+    String? itemName,
+    String? grade,
+    double? confidence,
+    List<String>? safetyFlags,
+    String? safetyGuidance,
+    double? estimatedBaseRatePerKg,
+    String? recommendedAction,
+    Map<String, dynamic>? visualFeatures,
+    Map<String, dynamic>? compositionBreakdown,
+    Map<String, dynamic>? fairValueEstimate,
+    bool? imageAnalyzed,
+    List<dynamic>? detectedComponents,
+    Map<String, dynamic>? componentAnalysis,
+    String? detectedText,
+    List<String>? extractedBrands,
+    List<String>? extractedModels,
+    List<String>? hazardKeywords,
+    double? ocrConfidence,
+    double? estimatedWeightKg,
+    double? quantity,
+  }) {
+    return AIClassifyResult(
+      category: category ?? this.category,
+      subcategory: subcategory ?? this.subcategory,
+      itemName: itemName ?? this.itemName,
+      grade: grade ?? this.grade,
+      confidence: confidence ?? this.confidence,
+      safetyFlags: safetyFlags ?? this.safetyFlags,
+      safetyGuidance: safetyGuidance ?? this.safetyGuidance,
+      estimatedBaseRatePerKg: estimatedBaseRatePerKg ?? this.estimatedBaseRatePerKg,
+      recommendedAction: recommendedAction ?? this.recommendedAction,
+      visualFeatures: visualFeatures ?? this.visualFeatures,
+      compositionBreakdown: compositionBreakdown ?? this.compositionBreakdown,
+      fairValueEstimate: fairValueEstimate ?? this.fairValueEstimate,
+      imageAnalyzed: imageAnalyzed ?? this.imageAnalyzed,
+      detectedComponents: detectedComponents ?? this.detectedComponents,
+      componentAnalysis: componentAnalysis ?? this.componentAnalysis,
+      detectedText: detectedText ?? this.detectedText,
+      extractedBrands: extractedBrands ?? this.extractedBrands,
+      extractedModels: extractedModels ?? this.extractedModels,
+      hazardKeywords: hazardKeywords ?? this.hazardKeywords,
+      ocrConfidence: ocrConfidence ?? this.ocrConfidence,
+      estimatedWeightKg: estimatedWeightKg ?? this.estimatedWeightKg,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'category': category,
+      'subcategory': subcategory,
+      'item_name': itemName,
+      'grade': grade,
+      'confidence': confidence,
+      'safety_flags': safetyFlags,
+      'safety_guidance': safetyGuidance,
+      'estimated_base_rate_per_kg': estimatedBaseRatePerKg,
+      'recommended_action': recommendedAction,
+      'visual_features': visualFeatures,
+      'composition_breakdown': compositionBreakdown,
+      'fair_value_estimate': fairValueEstimate,
+      'image_analyzed': imageAnalyzed,
+      'detected_components': detectedComponents,
+      'component_analysis': componentAnalysis,
+      'detected_text': detectedText,
+      'extracted_brands': extractedBrands,
+      'extracted_models': extractedModels,
+      'hazard_keywords': hazardKeywords,
+      'ocr_confidence': ocrConfidence,
+      'estimated_weight_kg': estimatedWeightKg,
+      'quantity': quantity,
+    };
   }
 }
 

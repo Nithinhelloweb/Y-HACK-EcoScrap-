@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/lot_model.dart';
@@ -759,6 +760,9 @@ class _CollectorScreenState extends State<CollectorScreen> {
             _scannedImageBytes = imageBytes;
             _selectedCategory = result.category;
             _selectedSubcategory = result.subcategory;
+            if (result.estimatedWeightKg > 0) {
+              _weightController.text = result.estimatedWeightKg.toStringAsFixed(1);
+            }
             if (result.fairValueEstimate != null) {
               _fairValueData = result.fairValueEstimate;
             }
@@ -776,6 +780,254 @@ class _CollectorScreenState extends State<CollectorScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _openEditAIResultDialog() {
+    if (_aiResult == null) return;
+    final ai = _aiResult!;
+    final isDark = AppTheme.isDark(context);
+
+    final nameCtrl = TextEditingController(text: ai.itemName);
+    final subcatCtrl = TextEditingController(text: ai.subcategory);
+    final weightCtrl = TextEditingController(text: ai.estimatedWeightKg.toStringAsFixed(1));
+    final qtyCtrl = TextEditingController(text: ai.quantity.toInt().toString());
+    String selectedCat = ai.category;
+
+    final categories = const [
+      {'code': 'ITEW', 'label': 'ITEW — IT & Telecom (Phones, Laptops, Peripherals)'},
+      {'code': 'PCB', 'label': 'PCB — Printed Circuit Boards & Motherboards'},
+      {'code': 'BATTERY', 'label': 'BATTERY — Li-Ion, Lead-Acid, UPS Cells (Hazardous)'},
+      {'code': 'CABLE', 'label': 'CABLE — Insulated Copper & Wiring'},
+      {'code': 'IT_EQUIPMENT', 'label': 'IT_EQUIPMENT — Printers, Servers, Appliances'},
+      {'code': 'DISPLAY', 'label': 'DISPLAY — Flat Panels & CRT Monitors'},
+      {'code': 'MIXED_SCRAP', 'label': 'MIXED_SCRAP — General Recyclables'},
+    ];
+
+    final validCatCodes = categories.map((c) => c['code']).toSet();
+    if (!validCatCodes.contains(selectedCat)) {
+      selectedCat = 'ITEW';
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardLight,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: isDark ? AppTheme.borderSubtle : AppTheme.borderLight),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, color: AppTheme.collectorColor, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Edit AI Detection Result',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context)),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.collectorColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.collectorColor.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.model_training_rounded, size: 16, color: AppTheme.collectorColor),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Corrections update fair value calculations and self-train the local AI model.',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.collectorColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Item Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., Optical USB Mouse, Samsung Galaxy A50',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Category (CPCB)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedCat,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: categories.map((c) {
+                      return DropdownMenuItem<String>(
+                        value: c['code'],
+                        child: Text(
+                          c['label']!,
+                          style: const TextStyle(fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedCat = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Subcategory Tag', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: subcatCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. MOUSE_PERIPHERAL, SMARTPHONE_HANDSET',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Weight (kg)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: weightCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                hintText: '1.0',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Quantity', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: qtyCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: '1',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: Text('Cancel', style: TextStyle(color: AppTheme.getTextSecondary(context))),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.collectorColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.check_rounded, size: 16),
+              label: const Text('Save & Update Lot', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () async {
+                final newName = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : ai.itemName;
+                final newSubcat = subcatCtrl.text.trim().isNotEmpty ? subcatCtrl.text.trim() : ai.subcategory;
+                final newWeight = double.tryParse(weightCtrl.text.trim()) ?? ai.estimatedWeightKg;
+                final newQty = double.tryParse(qtyCtrl.text.trim()) ?? ai.quantity;
+
+                String? b64;
+                if (_scannedImageBytes != null) {
+                  b64 = base64Encode(_scannedImageBytes!);
+                }
+                List<double>? bBox;
+                if (ai.detectedComponents != null && ai.detectedComponents!.isNotEmpty) {
+                  final first = ai.detectedComponents!.first;
+                  if (first is Map<String, dynamic> && first['normalized_box'] is List) {
+                    bBox = (first['normalized_box'] as List).map((e) => (e as num).toDouble()).toList();
+                  }
+                }
+
+                widget.apiService.submitDetectionFeedback(
+                  imageBase64: b64,
+                  originalItemName: ai.itemName,
+                  originalCategory: ai.category,
+                  originalSubcategory: ai.subcategory,
+                  correctedItemName: newName,
+                  correctedCategory: selectedCat,
+                  correctedSubcategory: newSubcat,
+                  correctedWeightKg: newWeight,
+                  correctedQuantity: newQty,
+                  correctedCondition: 'mixed',
+                  boundingBox: bBox,
+                  collectorId: 'COL-001',
+                ).then((res) {
+                  debugPrint('Self-training feedback submitted: ${res['sample_id']}');
+                }).catchError((err) {
+                  debugPrint('Feedback notice: $err');
+                });
+
+                setState(() {
+                  _aiResult = ai.copyWith(
+                    itemName: newName,
+                    category: selectedCat,
+                    subcategory: newSubcat,
+                    estimatedWeightKg: newWeight,
+                    quantity: newQty,
+                  );
+                  _selectedCategory = selectedCat;
+                  _selectedSubcategory = newSubcat;
+                  _weightController.text = newWeight.toStringAsFixed(1);
+                });
+
+                Navigator.of(dialogCtx).pop();
+                await _fetchFairValue();
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppTheme.collectorColor,
+                    content: Text('AI result updated & training sample recorded for model self-training!'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -847,16 +1099,42 @@ class _CollectorScreenState extends State<CollectorScreen> {
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.black45 : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${(ai.confidence * 100).toStringAsFixed(0)}% Match',
-                            style: const TextStyle(fontSize: 11, color: AppTheme.collectorColor, fontWeight: FontWeight.w700),
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.black45 : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${(ai.confidence * 100).toStringAsFixed(0)}% Match',
+                                style: const TextStyle(fontSize: 11, color: AppTheme.collectorColor, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: _openEditAIResultDialog,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.collectorColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppTheme.collectorColor.withValues(alpha: 0.4)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_rounded, size: 12, color: AppTheme.collectorColor),
+                                    SizedBox(width: 3),
+                                    Text('Edit', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.collectorColor)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1102,6 +1380,24 @@ class _CollectorScreenState extends State<CollectorScreen> {
                     );
                   },
                 ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                  side: const BorderSide(color: Color(0xFF8B5CF6)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                label: const Text(
+                  '✏️ Edit AI',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF8B5CF6),
+                  ),
+                ),
+                onPressed: _openEditAIResultDialog,
               ),
             ],
           ),
