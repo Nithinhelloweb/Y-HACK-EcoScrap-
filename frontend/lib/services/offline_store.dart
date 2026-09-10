@@ -6,6 +6,7 @@ import 'api_service.dart';
 
 class OfflineStore extends ChangeNotifier {
   static const String _outboxKey = 'ecoscrap_outbox';
+  static const String _cachedLotsKey = 'ecoscrap_cached_lots';
   
   bool _isOfflineMode = false;
   bool get isOfflineMode => _isOfflineMode;
@@ -18,12 +19,39 @@ class OfflineStore extends ChangeNotifier {
 
   int get pendingCount => _pendingOutbox.length;
 
+  bool _isSyncing = false;
+  bool get isSyncing => _isSyncing;
+
+  DateTime? _lastSyncTime;
+  DateTime? get lastSyncTime => _lastSyncTime;
+
+  String? _lastSyncStatus;
+  String? get lastSyncStatus => _lastSyncStatus;
+
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawOutbox = prefs.getStringList(_outboxKey) ?? [];
-    _pendingOutbox.clear();
-    for (final item in rawOutbox) {
-      _pendingOutbox.add(jsonDecode(item) as Map<String, dynamic>);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // 1. Load pending outbox
+      final rawOutbox = prefs.getStringList(_outboxKey) ?? [];
+      _pendingOutbox.clear();
+      for (final item in rawOutbox) {
+        try {
+          _pendingOutbox.add(jsonDecode(item) as Map<String, dynamic>);
+        } catch (_) {}
+      }
+
+      // 2. Load cached lots from persistent storage
+      final rawLots = prefs.getStringList(_cachedLotsKey) ?? [];
+      _inMemoryLots.clear();
+      for (final item in rawLots) {
+        try {
+          final map = jsonDecode(item) as Map<String, dynamic>;
+          _inMemoryLots.add(LotModel.fromJson(map));
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('OfflineStore init error: $e');
     }
     notifyListeners();
   }
@@ -33,9 +61,17 @@ class OfflineStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setLots(List<LotModel> newLots) {
+  void setOfflineMode(bool value) {
+    if (_isOfflineMode != value) {
+      _isOfflineMode = value;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setLots(List<LotModel> newLots) async {
     _inMemoryLots.clear();
     _inMemoryLots.addAll(newLots);
+    await _persistCachedLots();
     notifyListeners();
   }
 
@@ -70,8 +106,9 @@ class OfflineStore extends ChangeNotifier {
       isOfflinePending: true,
     );
 
-    // Update in-memory state immediately for responsive UI
+    // Update in-memory state immediately for ultra-responsive UI
     _inMemoryLots.insert(0, localLot);
+    await _persistCachedLots();
 
     if (_isOfflineMode) {
       // Save to outbox queue for future sync
@@ -92,7 +129,7 @@ class OfflineStore extends ChangeNotifier {
       // Live online API call
       try {
         final serverLot = await apiService.createLot(
-          collectorId: 'COL-TN-019284',
+          collectorId: effectiveCollectorId,
           category: category,
           subcategory: subcategory,
           weightKg: weightKg,
@@ -103,18 +140,19 @@ class OfflineStore extends ChangeNotifier {
         if (idx != -1) {
           _inMemoryLots[idx] = serverLot;
         }
+        await _persistCachedLots();
         notifyListeners();
         return serverLot;
       } catch (e) {
         // Fallback to offline queue on network failure
         final outboxItem = {
           'client_temp_id': tempId,
-          'collector_id': 'COL-TN-019284',
+          'collector_id': effectiveCollectorId,
           'category': category,
           'subcategory': subcategory,
           'estimated_weight_kg': weightKg,
           'condition': condition,
-          'created_timestamp': DateTime.now().toIsoformatString(),
+          'created_timestamp': DateTime.now().toIso8601String(),
         };
         _pendingOutbox.add(outboxItem);
         await _persistOutbox();
@@ -125,7 +163,15 @@ class OfflineStore extends ChangeNotifier {
   }
 
   Future<int> syncPendingQueue(ApiService apiService) async {
-    if (_pendingOutbox.isEmpty) return 0;
+    if (_pendingOutbox.isEmpty) {
+      _lastSyncTime = DateTime.now();
+      _lastSyncStatus = 'All lots already synced';
+      notifyListeners();
+      return 0;
+    }
+
+    _isSyncing = true;
+    notifyListeners();
 
     try {
       final syncPayload = {'items': List<Map<String, dynamic>>.from(_pendingOutbox)};
@@ -137,13 +183,21 @@ class OfflineStore extends ChangeNotifier {
 
       // Refresh in-memory lots from server
       final freshLots = await apiService.fetchLots();
-      setLots(freshLots);
+      _inMemoryLots.clear();
+      _inMemoryLots.addAll(freshLots);
+      await _persistCachedLots();
 
-      notifyListeners();
+      _lastSyncTime = DateTime.now();
+      _lastSyncStatus = 'Successfully synced $syncedCount offline lots';
+      _isOfflineMode = false;
       return syncedCount;
     } catch (e) {
       debugPrint('Sync failed: $e');
+      _lastSyncStatus = 'Sync error: $e';
       return 0;
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 
@@ -152,8 +206,14 @@ class OfflineStore extends ChangeNotifier {
     final serialized = _pendingOutbox.map((item) => jsonEncode(item)).toList();
     await prefs.setStringList(_outboxKey, serialized);
   }
-}
 
-extension DateTimeIso on DateTime {
-  String toIsoformatString() => toUtc().toIso8601String();
+  Future<void> _persistCachedLots() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serialized = _inMemoryLots.map((item) => jsonEncode(item.toJson())).toList();
+      await prefs.setStringList(_cachedLotsKey, serialized);
+    } catch (e) {
+      debugPrint('Failed to persist cached lots: $e');
+    }
+  }
 }

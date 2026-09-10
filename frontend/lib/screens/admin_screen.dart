@@ -7,11 +7,13 @@ import '../widgets/ecoscrap_logo.dart';
 class AdminScreen extends StatefulWidget {
   final ApiService apiService;
   final String currentLang;
+  final int initialTab;
 
   const AdminScreen({
     super.key,
     required this.apiService,
     required this.currentLang,
+    this.initialTab = 0,
   });
 
   @override
@@ -34,8 +36,20 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 3),
+    );
     _loadAll();
+  }
+
+  @override
+  void didUpdateWidget(AdminScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab && widget.initialTab < 4) {
+      _tabController.animateTo(widget.initialTab.clamp(0, 3));
+    }
   }
 
   @override
@@ -192,7 +206,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _buildKpiCard('Avg Trust Score', '${(m['avg_trust_score'] as num?)?.toStringAsFixed(1) ?? '—'}', Icons.star_rounded, Colors.amber.shade700)),
+                Expanded(child: _buildKpiCard('Avg Trust Score', (m['avg_trust_score'] as num?)?.toStringAsFixed(1) ?? '—', Icons.star_rounded, Colors.amber.shade700)),
                 const SizedBox(width: 10),
                 Expanded(child: _buildKpiCard('Anomaly Rate', '${(m['anomaly_rate'] as num?)?.toStringAsFixed(1) ?? '0'}%', Icons.warning_rounded, AppTheme.alertRed)),
               ],

@@ -8,11 +8,13 @@ import '../widgets/ecoscrap_logo.dart';
 class RecyclerScreen extends StatefulWidget {
   final ApiService apiService;
   final String currentLang;
+  final int initialTab;
 
   const RecyclerScreen({
     super.key,
     required this.apiService,
     required this.currentLang,
+    this.initialTab = 0,
   });
 
   @override
@@ -23,11 +25,13 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
   List<LotModel> _lots = [];
   bool _isLoading = false;
   String _selectedCategoryFilter = 'ALL';
-  bool _showMyBids = false;
+  bool _showMyBids = true;
 
   // Performance stats & bid history
   Map<String, dynamic>? _recyclerStats;
   List<Map<String, dynamic>> _myBids = [];
+
+  late int _currentSubTab;
 
   final _otpController = TextEditingController();
   final _scaleWeightController = TextEditingController();
@@ -37,8 +41,17 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
   @override
   void initState() {
     super.initState();
+    _currentSubTab = widget.initialTab;
     _fetchLots();
     _loadRecyclerStats();
+  }
+
+  @override
+  void didUpdateWidget(RecyclerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab) {
+      setState(() => _currentSubTab = widget.initialTab);
+    }
   }
 
   Future<void> _loadRecyclerStats() async {
@@ -344,6 +357,14 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final handoverLots = _lots.where((l) => l.status == 'BID_SELECTED' || l.status == 'HANDOVER_SCHEDULED').toList();
+    final pipelineLots = _lots.where((l) =>
+        l.status == 'RECEIVED' ||
+        l.status == 'PROCESSING' ||
+        l.status == 'MATERIAL_RECOVERED' ||
+        l.status == 'CLOSED'
+    ).toList();
+
     return RefreshIndicator(
       color: AppTheme.recyclerColor,
       backgroundColor: AppTheme.getCardBg(context),
@@ -354,128 +375,335 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
               children: [
                 // Recycler Profile Header Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.cardBoxDecoration(
-                    color: AppTheme.getCardBg(context),
-                    borderColor: AppTheme.recyclerColor.withValues(alpha: 0.35),
-                    context: context,
+                _buildRecyclerHeaderCard(context),
+                const SizedBox(height: 12),
+
+                // Modular Sub-Tab Bar
+                _buildSubTabBar(context, handoverLots.length, pipelineLots.length),
+                const SizedBox(height: 14),
+
+                // Sub-Tab 0: Marketplace Lots
+                if (_currentSubTab == 0) ...[
+                  // Material Category Filter Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip(context, 'ALL', 'All Materials'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'ITEW', 'Smartphones & Mobiles'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'PCB', 'Circuit Boards (PCB)'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'BATTERY', 'Batteries (Haz)'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'CABLE', 'Copper Cables'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'IT_EQUIPMENT', 'IT Scrap & Laptops'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'DISPLAY', 'Displays & Screens'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(context, 'MIXED_SCRAP', 'Mixed Scrap'),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 14),
+
+                  // Marketplace Lots Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const EcoScrapLogo(size: 48, borderRadius: 14),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('GreenTech Circular Solutions',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
-                            const SizedBox(height: 2),
-                            Text('CPCB Reg: CPCB-TN-REC-2024-8812 • SIDCO Estate',
-                                style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: AppTheme.pillBadgeDecoration(AppTheme.recyclerColor, context: context),
-                                  child: const Text('⭐ 96% Reliability Rating',
-                                      style: TextStyle(color: AppTheme.recyclerColor, fontSize: 11, fontWeight: FontWeight.w800)),
-                                ),
-                                Text('Cap: 2,500 kg/day', style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
-                              ],
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.recyclerColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ],
-                        ),
+                            child: const Icon(Icons.storefront_rounded, color: AppTheme.recyclerColor, size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('Active E-Waste Lots (${_filteredLots.length})',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context))),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, color: AppTheme.recyclerColor, size: 20),
+                        tooltip: 'Refresh marketplace',
+                        onPressed: _fetchLots,
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 10),
 
-                // ── Performance Reputation Card ─────────────────────────────
-                _buildPerformanceCard(),
-                const SizedBox(height: 14),
+                  if (_filteredLots.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+                      child: Column(
+                        children: [
+                          Icon(Icons.inventory_rounded, size: 40, color: AppTheme.getTextSecondary(context)),
+                          const SizedBox(height: 10),
+                          Text('No active lots matching this filter.',
+                              style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    )
+                  else
+                    ..._filteredLots.map((lot) => _buildRecyclerLotCard(context, lot)),
+                  const SizedBox(height: 20),
+                ],
 
-                // ── My Bids Tracker ─────────────────────────────────────────
-                _buildMyBidsSection(),
-                const SizedBox(height: 14),
-
-                // Material Category Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                // Sub-Tab 1: My Bids & Handover
+                if (_currentSubTab == 1) ...[
+                  _buildMyBidsSection(),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      _buildFilterChip(context, 'ALL', 'All Materials'),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4338CA).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.scale_rounded, color: Color(0xFF6366F1), size: 18),
+                      ),
                       const SizedBox(width: 8),
-                      _buildFilterChip(context, 'ITEW', 'Smartphones & Mobiles'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'PCB', 'Circuit Boards (PCB)'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'BATTERY', 'Batteries (Haz)'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'CABLE', 'Copper Cables'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'IT_EQUIPMENT', 'IT Scrap & Laptops'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'DISPLAY', 'Displays & Screens'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(context, 'MIXED_SCRAP', 'Mixed Scrap'),
+                      Text('Pending Handover & Scale Verification (${handoverLots.length})',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context))),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  if (handoverLots.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+                      child: Center(
+                        child: Text('No lots currently awaiting handover or scale verification.',
+                            style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+                      ),
+                    )
+                  else
+                    ...handoverLots.map((lot) => _buildRecyclerLotCard(context, lot)),
+                  const SizedBox(height: 20),
+                ],
 
-                // Marketplace Lots Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.recyclerColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.storefront_rounded, color: AppTheme.recyclerColor, size: 18),
-                        ),
-                        const SizedBox(width: 8),
-                        Text('Active E-Waste Lots (${_filteredLots.length})',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context))),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.recyclerColor, size: 20),
-                      tooltip: 'Refresh marketplace',
-                      onPressed: _fetchLots,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                // Sub-Tab 2: Processing Pipeline
+                if (_currentSubTab == 2) ...[
+                  _buildPipelineInfoBanner(context),
+                  const SizedBox(height: 12),
+                  if (pipelineLots.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+                      child: Column(
+                        children: [
+                          Icon(Icons.precision_manufacturing_rounded, size: 40, color: AppTheme.getTextSecondary(context)),
+                          const SizedBox(height: 10),
+                          Text('No lots currently in the recovery pipeline.',
+                              style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('Once physical handover is verified, received lots appear here to start dismantling.',
+                              style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12), textAlign: TextAlign.center),
+                        ],
+                      ),
+                    )
+                  else
+                    ...pipelineLots.map((lot) => _buildRecyclerLotCard(context, lot)),
+                  const SizedBox(height: 20),
+                ],
 
-                if (_filteredLots.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(28),
-                    decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
-                    child: Column(
-                      children: [
-                        Icon(Icons.inventory_rounded, size: 40, color: AppTheme.getTextSecondary(context)),
-                        const SizedBox(height: 10),
-                        Text('No active lots matching this filter.',
-                            style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  )
-                else
-                  ..._filteredLots.map((lot) => _buildRecyclerLotCard(context, lot)),
+                // Sub-Tab 3: Performance & Stats
+                if (_currentSubTab == 3) ...[
+                  _buildPerformanceCard(),
+                  const SizedBox(height: 14),
+                  _buildRecyclerRosterCard(context),
+                  const SizedBox(height: 20),
+                ],
               ],
             ),
+    );
+  }
+
+  Widget _buildRecyclerHeaderCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: AppTheme.recyclerColor.withValues(alpha: 0.35),
+        context: context,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const EcoScrapLogo(size: 48, borderRadius: 14),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('GreenTech Circular Solutions',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
+                const SizedBox(height: 2),
+                Text('CPCB Reg: CPCB-TN-REC-2024-8812 • SIDCO Estate',
+                    style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: AppTheme.pillBadgeDecoration(AppTheme.recyclerColor, context: context),
+                      child: const Text('⭐ 96% Reliability Rating',
+                          style: TextStyle(color: AppTheme.recyclerColor, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ),
+                    Text('Cap: 2,500 kg/day', style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubTabBar(BuildContext context, int handoverCount, int pipelineCount) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _subTabChip(0, '🏪 Marketplace', _filteredLots.length),
+          const SizedBox(width: 8),
+          _subTabChip(1, '💼 My Bids & Handover', _myBids.isNotEmpty ? _myBids.length : null),
+          const SizedBox(width: 8),
+          _subTabChip(2, '⚙️ Pipeline', pipelineCount > 0 ? pipelineCount : null),
+          const SizedBox(width: 8),
+          _subTabChip(3, '📊 Performance', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _subTabChip(int index, String label, int? badgeCount) {
+    final isSelected = _currentSubTab == index;
+    return InkWell(
+      onTap: () => setState(() => _currentSubTab = index),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.recyclerColor.withValues(alpha: 0.18)
+              : AppTheme.getSurface(context),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.recyclerColor : AppTheme.getBorder(context),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? AppTheme.recyclerColor : AppTheme.getTextPrimary(context),
+              ),
+            ),
+            if (badgeCount != null) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.recyclerColor : AppTheme.getTextSecondary(context).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? Colors.white : AppTheme.getTextPrimary(context),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPipelineInfoBanner(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF059669).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.account_tree_rounded, color: Color(0xFF059669), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Material Recovery Lifecycle Stepper',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF059669)),
+                ),
+                Text(
+                  'RECEIVED ➔ 🔧 START PROCESSING ➔ ✅ RECOVERED ➔ 🔒 CLOSE LOT',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.getTextSecondary(context)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecyclerRosterCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: AppTheme.recyclerColor.withValues(alpha: 0.25),
+        context: context,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user_rounded, color: AppTheme.recyclerColor, size: 20),
+              const SizedBox(width: 8),
+              Text('CPCB Formal Authorization Roster',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppTheme.getTextPrimary(context))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Authorized for Dismantling & Segregation: ITEW1 (Cellphones, Tablets), PCB High-Grade, Battery Waste, CRT / Flat Panel Displays.',
+            style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context), height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text('State Auth: TN-PCB-COIMBATORE-HUB-01', style: TextStyle(fontSize: 11, color: AppTheme.recyclerColor, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

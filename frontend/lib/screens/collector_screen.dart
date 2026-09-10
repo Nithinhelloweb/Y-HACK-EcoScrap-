@@ -15,6 +15,7 @@ class CollectorScreen extends StatefulWidget {
   final OfflineStore offlineStore;
   final String currentLang;
   final Function(String) onLangChanged;
+  final int initialTab;
 
   const CollectorScreen({
     super.key,
@@ -22,6 +23,7 @@ class CollectorScreen extends StatefulWidget {
     required this.offlineStore,
     required this.currentLang,
     required this.onLangChanged,
+    this.initialTab = 0,
   });
 
   @override
@@ -42,15 +44,26 @@ class _CollectorScreenState extends State<CollectorScreen> {
   // Dynamic profile & earnings
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _paymentHistory = [];
-  bool _showPaymentHistory = false;
+  bool _showPaymentHistory = true;
+
+  late int _currentSubTab;
 
   String t(String key) => AppTranslations.get(key, widget.currentLang);
 
   @override
   void initState() {
     super.initState();
+    _currentSubTab = widget.initialTab;
     _loadLots();
     _loadProfileAndEarnings();
+  }
+
+  @override
+  void didUpdateWidget(CollectorScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab) {
+      setState(() => _currentSubTab = widget.initialTab);
+    }
   }
 
   Future<void> _loadProfileAndEarnings() async {
@@ -289,86 +302,236 @@ class _CollectorScreenState extends State<CollectorScreen> {
             children: [
               // Connectivity & Outbox Banner
               _buildConnectivityBanner(store),
+              const SizedBox(height: 12),
+
+              // Modular Sub-Tab Bar
+              _buildSubTabBar(store),
               const SizedBox(height: 14),
 
-              // Collector Trust Card
-              _buildCollectorTrustCard(),
-              const SizedBox(height: 14),
-
-              // Voice & AI Action Hub
-              _buildActionHub(),
-              const SizedBox(height: 14),
-
-              // AI Lens Result & Safety Hazard Warning (if triggered)
-              if (_aiResult != null) ...[
-                _buildAIResultCard(),
-                const SizedBox(height: 14),
-              ],
-
-              // Fair Pricing Transparency Card
-              if (_fairValueData != null) ...[
-                _buildFairValueCard(),
-                const SizedBox(height: 14),
-              ],
-
-              // Quick New Lot Creation Form
-              _buildLotFormCard(),
-              const SizedBox(height: 16),
-
-              // Collector Lots Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.collectorColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.inventory_2_rounded, color: AppTheme.collectorColor, size: 18),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(t('my_lots_heading'),
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
-                    ],
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.refresh_rounded, size: 16, color: AppTheme.collectorColor),
-                    label: Text(t('sync_btn'), style: const TextStyle(color: AppTheme.collectorColor, fontSize: 12)),
-                    onPressed: _loadLots,
-                  ),
+              // Sub-Tab 0: Smart Intake & AI Lens
+              if (_currentSubTab == 0) ...[
+                _buildActionHub(),
+                if (_aiResult != null) ...[
+                  const SizedBox(height: 14),
+                  _buildAIResultCard(),
                 ],
-              ),
-              const SizedBox(height: 10),
+                if (_fairValueData != null) ...[
+                  const SizedBox(height: 14),
+                  _buildFairValueCard(),
+                ],
+                const SizedBox(height: 14),
+                _buildLotFormCard(),
+                const SizedBox(height: 20),
+              ],
 
-              if (store.lots.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
-                  child: Column(
-                    children: [
-                      const EcoScrapLogo(size: 48, borderRadius: 14),
-                      const SizedBox(height: 10),
-                      Text('No lots created yet.', style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text('Use AI Lens or voice input above to create your first formal lot draft.',
-                          style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12), textAlign: TextAlign.center),
-                    ],
-                  ),
-                )
-              else
-                ...store.lots.map((lot) => _buildLotItem(lot)),
+              // Sub-Tab 1: My Collections & Lots
+              if (_currentSubTab == 1) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.collectorColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.inventory_2_rounded, color: AppTheme.collectorColor, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(t('my_lots_heading'),
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
+                      ],
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.refresh_rounded, size: 16, color: AppTheme.collectorColor),
+                      label: Text(t('sync_btn'), style: const TextStyle(color: AppTheme.collectorColor, fontSize: 12)),
+                      onPressed: _loadLots,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (store.lots.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: AppTheme.cardBoxDecoration(color: AppTheme.getCardBg(context), context: context),
+                    child: Column(
+                      children: [
+                        const EcoScrapLogo(size: 48, borderRadius: 14),
+                        const SizedBox(height: 10),
+                        Text('No lots created yet.', style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('Use AI Lens or voice input in the Intake tab to create your first lot draft.',
+                            style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12), textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.collectorColor,
+                            foregroundColor: Colors.black,
+                          ),
+                          icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                          label: const Text('Go to Intake & AI Lens', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                          onPressed: () => setState(() => _currentSubTab = 0),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...store.lots.map((lot) => _buildLotItem(lot)),
+                const SizedBox(height: 20),
+              ],
 
-              // ── Earnings & Payment History Section ──────────────────────────
-              const SizedBox(height: 20),
-              _buildEarningsPanel(),
-              const SizedBox(height: 20),
+              // Sub-Tab 2: Earnings & Settlements
+              if (_currentSubTab == 2) ...[
+                _buildEarningsPanel(),
+                const SizedBox(height: 20),
+              ],
+
+              // Sub-Tab 3: Trust & Safety
+              if (_currentSubTab == 3) ...[
+                _buildCollectorTrustCard(),
+                const SizedBox(height: 14),
+                _buildSafetyGuidanceCard(),
+                const SizedBox(height: 20),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSubTabBar(OfflineStore store) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _subTabChip(0, '🤖 Intake & AI', null),
+          const SizedBox(width: 8),
+          _subTabChip(1, '📦 My Lots', store.lots.isNotEmpty ? store.lots.length : null),
+          const SizedBox(width: 8),
+          _subTabChip(2, '💰 Earnings', _paymentHistory.isNotEmpty ? _paymentHistory.length : null),
+          const SizedBox(width: 8),
+          _subTabChip(3, '🛡️ Trust & Safety', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _subTabChip(int index, String label, int? badgeCount) {
+    final isSelected = _currentSubTab == index;
+    return InkWell(
+      onTap: () => setState(() => _currentSubTab = index),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.collectorColor.withValues(alpha: 0.18)
+              : AppTheme.getSurface(context),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.collectorColor : AppTheme.getBorder(context),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? AppTheme.collectorColor : AppTheme.getTextPrimary(context),
+              ),
+            ),
+            if (badgeCount != null) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.collectorColor : AppTheme.getTextSecondary(context).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? Colors.black : AppTheme.getTextPrimary(context),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSafetyGuidanceCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: AppTheme.alertAmber.withValues(alpha: 0.3),
+        context: context,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.alertAmber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.security_rounded, color: AppTheme.alertAmber, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CPCB E-Waste Handling Protocols',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppTheme.getTextPrimary(context)),
+                    ),
+                    Text(
+                      'Tamil Nadu PCB Formalization Standard',
+                      style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Informal collectors must follow verified safety standards when handling hazardous components (Lithium-ion batteries, CRT phosphor, mercury backlights, leaded solder).',
+            style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context), height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.alertAmber,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              icon: const Icon(Icons.shield_rounded, size: 16),
+              label: const Text('View All Safety Protocols', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              onPressed: _showSafetyProtocolsDialog,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

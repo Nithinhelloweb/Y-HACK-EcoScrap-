@@ -55,6 +55,19 @@ void main() {
       expect(store.pendingCount, equals(1));
       expect(store.pendingOutbox.first['category'], equals('PCB'));
       expect(store.pendingOutbox.first['estimated_weight_kg'], equals(8.4));
+
+      // Verify persistent re-initialization restores cached lots and outbox
+      final secondStore = OfflineStore();
+      await secondStore.init();
+      expect(secondStore.lots.length, equals(1));
+      expect(secondStore.lots.first.lotCode, startsWith('OFFLINE-LOT-'));
+      expect(secondStore.pendingCount, equals(1));
+    });
+
+    test('Sync state defaults and status tracking work correctly', () {
+      expect(store.isSyncing, isFalse);
+      expect(store.lastSyncTime, isNull);
+      expect(store.lastSyncStatus, isNull);
     });
   });
 }
