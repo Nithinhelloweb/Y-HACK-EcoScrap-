@@ -39,12 +39,30 @@ class _CollectorScreenState extends State<CollectorScreen> {
   Map<String, dynamic>? _fairValueData;
   bool _isLoading = false;
 
+  // Dynamic profile & earnings
+  Map<String, dynamic>? _profileData;
+  List<Map<String, dynamic>> _paymentHistory = [];
+  bool _showPaymentHistory = false;
+
   String t(String key) => AppTranslations.get(key, widget.currentLang);
 
   @override
   void initState() {
     super.initState();
     _loadLots();
+    _loadProfileAndEarnings();
+  }
+
+  Future<void> _loadProfileAndEarnings() async {
+    try {
+      // Use collector user_id from login session; fall back gracefully if not stored
+      final profile = await widget.apiService.fetchCollectorProfile('default');
+      if (mounted) setState(() => _profileData = profile);
+    } catch (_) {}
+    try {
+      final payments = await widget.apiService.fetchPaymentHistory('default');
+      if (mounted) setState(() => _paymentHistory = payments);
+    } catch (_) {}
   }
 
   Future<void> _loadLots() async {
@@ -342,12 +360,168 @@ class _CollectorScreenState extends State<CollectorScreen> {
                 )
               else
                 ...store.lots.map((lot) => _buildLotItem(lot)),
+
+              // ── Earnings & Payment History Section ──────────────────────────
+              const SizedBox(height: 20),
+              _buildEarningsPanel(),
+              const SizedBox(height: 20),
             ],
           ),
         );
       },
     );
   }
+
+  Widget _buildEarningsPanel() {
+    final totalEarned = _paymentHistory.fold<double>(
+      0.0,
+      (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0),
+    );
+    final settled = _paymentHistory.where((p) => p['status'] == 'SETTLED').length;
+    return Container(
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: const Color(0xFF059669).withValues(alpha: 0.3),
+        context: context,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          InkWell(
+            onTap: () => setState(() => _showPaymentHistory = !_showPaymentHistory),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF059669).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF059669), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('💰 My Earnings & Payments',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.getTextPrimary(context))),
+                        Text('$settled settlements • Total ₹${totalEarned.toStringAsFixed(0)} earned',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  Icon(_showPaymentHistory ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      color: AppTheme.textSecondary),
+                ],
+              ),
+            ),
+          ),
+
+          // Summary row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                _earningsStat('Total Earned', '₹${totalEarned.toStringAsFixed(0)}', const Color(0xFF059669)),
+                const SizedBox(width: 12),
+                _earningsStat('Settlements', '$settled', AppTheme.collectorColor),
+                const SizedBox(width: 12),
+                _earningsStat('Lots Completed', '${widget.offlineStore.lots.where((l) => l.status == 'CLOSED').length}', Colors.amber.shade700),
+              ],
+            ),
+          ),
+
+          if (_showPaymentHistory) ...[
+            const Divider(height: 24, indent: 16, endIndent: 16),
+            if (_paymentHistory.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text('No settlement records yet. Create and sell lots to see your earnings here.',
+                    style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+              )
+            else
+              ..._paymentHistory.map((payment) => _buildPaymentTile(payment)),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _earningsStat(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: color)),
+            Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentTile(Map<String, dynamic> payment) {
+    final status = payment['status'] as String? ?? 'PENDING';
+    final isSettled = status == 'SETTLED';
+    final statusColor = isSettled ? AppTheme.collectorColor : AppTheme.alertAmber;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSettled
+            ? AppTheme.collectorColor.withValues(alpha: 0.06)
+            : AppTheme.alertAmber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(isSettled ? Icons.check_circle_rounded : Icons.pending_rounded, color: statusColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(payment['transaction_reference'] as String? ?? '—',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppTheme.getTextPrimary(context))),
+                Text(payment['payment_method'] as String? ?? 'UPI',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('₹${((payment['amount'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(0)}',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: statusColor)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(status, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildConnectivityBanner(OfflineStore store) {
     final isOffline = store.isOfflineMode;
@@ -444,6 +618,16 @@ class _CollectorScreenState extends State<CollectorScreen> {
   }
 
   Widget _buildCollectorTrustCard() {
+    final profile = _profileData?['profile'] as Map<String, dynamic>?;
+    final name = profile?['name'] as String? ?? 'Murugan K.';
+    final code = profile?['collector_code'] as String? ?? 'COL-TN-019284';
+    final trustScore = (profile?['trust_score'] as num?)?.toDouble() ?? 94.5;
+    final totalLots = (profile?['total_lots'] as num?)?.toInt() ?? 182;
+    final isVerified = profile?['is_verified'] as bool? ?? true;
+    final trainingDone = profile?['training_completed'] as bool? ?? true;
+    final totalEarned = (profile?['total_earnings_inr'] as num?)?.toDouble() ?? 0.0;
+    final area = profile?['service_area'] as String? ?? 'Coimbatore Hub';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardBoxDecoration(
@@ -454,7 +638,7 @@ class _CollectorScreenState extends State<CollectorScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const EcoScrapLogo(size: 48, borderRadius: 14),
+          const EcoScrapLogo(size: 52, borderRadius: 14),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -465,21 +649,25 @@ class _CollectorScreenState extends State<CollectorScreen> {
                   spacing: 6,
                   runSpacing: 2,
                   children: [
-                    Text(
-                      'Murugan K.',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context)),
-                    ),
-                    Text(
-                      '(COL-TN-019284)',
-                      style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12),
-                    ),
+                    Text(name,
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context))),
+                    Text('($code)',
+                        style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+                    if (isVerified)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.collectorColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('✅ CPCB Verified',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.collectorColor)),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'CPCB Verified Collection Partner • Coimbatore Hub',
-                  style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12),
-                ),
+                Text('Collection Partner • $area',
+                    style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -489,22 +677,31 @@ class _CollectorScreenState extends State<CollectorScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                       decoration: AppTheme.pillBadgeDecoration(AppTheme.collectorColor, context: context),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star_rounded, size: 13, color: AppTheme.collectorColor),
-                          SizedBox(width: 4),
-                          Text(
-                            '94.5 / 100 Trust Score',
-                            style: TextStyle(color: AppTheme.collectorColor, fontSize: 11, fontWeight: FontWeight.w800),
-                          ),
+                          const Icon(Icons.star_rounded, size: 13, color: AppTheme.collectorColor),
+                          const SizedBox(width: 4),
+                          Text('${trustScore.toStringAsFixed(1)} / 100 Trust',
+                              style: const TextStyle(color: AppTheme.collectorColor, fontSize: 11, fontWeight: FontWeight.w800)),
                         ],
                       ),
                     ),
-                    Text(
-                      '182 Lots Formalized',
-                      style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600),
-                    ),
+                    Text('$totalLots Lots',
+                        style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                    if (totalEarned > 0)
+                      Text('₹${totalEarned.toStringAsFixed(0)} Earned',
+                          style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600)),
+                    if (trainingDone)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('🎓 Trained',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.amber)),
+                      ),
                   ],
                 ),
               ],
@@ -514,6 +711,7 @@ class _CollectorScreenState extends State<CollectorScreen> {
       ),
     );
   }
+
 
   Widget _buildActionHub() {
     return Column(

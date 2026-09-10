@@ -20,7 +20,8 @@ from backend.app.api import (
     collections,
     pricing,
     payments,
-    recyclers
+    recyclers,
+    admin_analytics
 )
 
 logger = logging.getLogger("ecoscrap")
@@ -76,6 +77,8 @@ app.include_router(collections.router, prefix=settings.API_V1_STR)
 app.include_router(pricing.router, prefix=settings.API_V1_STR)
 app.include_router(payments.router, prefix=settings.API_V1_STR)
 app.include_router(recyclers.router, prefix=settings.API_V1_STR)
+app.include_router(admin_analytics.router, prefix=settings.API_V1_STR)
+
 
 @app.get("/")
 def root():

@@ -491,4 +491,129 @@ class ApiService {
       ];
     }
   }
+
+  // ─── Collector Profile & Earnings ───────────────────────────────────────────
+
+  Future<Map<String, dynamic>> fetchCollectorProfile(String userId) async {
+    final uri = Uri.parse('$baseUrl/auth/profile/$userId');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch profile: ${response.body}');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPaymentHistory(String collectorId) async {
+    final uri = Uri.parse('$baseUrl/payments/collector/$collectorId');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to fetch payment history: ${response.body}');
+  }
+
+  // ─── Recycler Bid History & Performance ─────────────────────────────────────
+
+  Future<Map<String, dynamic>> fetchRecyclerBids(String recyclerId) async {
+    final uri = Uri.parse('$baseUrl/recycler/$recyclerId/bids');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch recycler bids: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> fetchRecyclerStats(String recyclerId) async {
+    final uri = Uri.parse('$baseUrl/recycler/$recyclerId/stats');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch recycler stats: ${response.body}');
+  }
+
+  // ─── Lot Lifecycle Transitions ──────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> markLotProcessing(String lotId) async {
+    final uri = Uri.parse('$baseUrl/lots/$lotId/process');
+    final response = await http.post(uri);
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to mark lot as processing: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> markLotRecovered(String lotId) async {
+    final uri = Uri.parse('$baseUrl/lots/$lotId/recover');
+    final response = await http.post(uri);
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to mark lot as recovered: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> closeLot(String lotId) async {
+    final uri = Uri.parse('$baseUrl/lots/$lotId/close');
+    final response = await http.post(uri);
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to close lot: ${response.body}');
+  }
+
+  // ─── Admin Analytics ─────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> fetchAdminCollectors() async {
+    final uri = Uri.parse('$baseUrl/admin/collectors');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to fetch collectors: ${response.body}');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAdminRecyclers() async {
+    final uri = Uri.parse('$baseUrl/admin/recyclers');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to fetch recyclers: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> fetchMarketTrends() async {
+    final uri = Uri.parse('$baseUrl/admin/market-trends');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch market trends: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> fetchEnvironmentalSummary() async {
+    final uri = Uri.parse('$baseUrl/admin/environmental-impact');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch environmental impact: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> fetchFraudAlerts({String? severity}) async {
+    final uri = Uri.parse(
+        '$baseUrl/admin/fraud-alerts${severity != null ? '?severity=$severity' : ''}');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch fraud alerts: ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> verifyUser(
+      String userId, bool verified) async {
+    final uri = Uri.parse('$baseUrl/admin/verify-user');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': userId, 'verified': verified}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to verify user: ${response.body}');
+  }
 }

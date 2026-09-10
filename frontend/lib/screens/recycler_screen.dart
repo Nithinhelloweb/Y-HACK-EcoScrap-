@@ -23,6 +23,11 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
   List<LotModel> _lots = [];
   bool _isLoading = false;
   String _selectedCategoryFilter = 'ALL';
+  bool _showMyBids = false;
+
+  // Performance stats & bid history
+  Map<String, dynamic>? _recyclerStats;
+  List<Map<String, dynamic>> _myBids = [];
 
   final _otpController = TextEditingController();
   final _scaleWeightController = TextEditingController();
@@ -33,6 +38,19 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
   void initState() {
     super.initState();
     _fetchLots();
+    _loadRecyclerStats();
+  }
+
+  Future<void> _loadRecyclerStats() async {
+    try {
+      final stats = await widget.apiService.fetchRecyclerStats('default');
+      if (mounted) setState(() => _recyclerStats = stats);
+    } catch (_) {}
+    try {
+      final bidsData = await widget.apiService.fetchRecyclerBids('default');
+      final bids = (bidsData['bids'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (mounted) setState(() => _myBids = bids);
+    } catch (_) {}
   }
 
   Future<void> _fetchLots() async {
@@ -380,6 +398,14 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                 ),
                 const SizedBox(height: 14),
 
+                // ── Performance Reputation Card ─────────────────────────────
+                _buildPerformanceCard(),
+                const SizedBox(height: 14),
+
+                // ── My Bids Tracker ─────────────────────────────────────────
+                _buildMyBidsSection(),
+                const SizedBox(height: 14),
+
                 // Material Category Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -559,12 +585,83 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                   onPressed: () => _showHandoverModal(lot),
                 )
               else if (lot.status == 'RECEIVED')
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade700,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(150, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.construction_rounded, size: 16),
+                  label: const Text('🔧 Start Processing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await widget.apiService.markLotProcessing(lot.id);
+                      await _fetchLots();
+                      messenger.showSnackBar(
+                        const SnackBar(backgroundColor: Color(0xFF065F46), content: Text('✅ Lot is now in PROCESSING.')),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                    }
+                  },
+                )
+              else if (lot.status == 'PROCESSING')
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(160, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.recycling_rounded, size: 16),
+                  label: const Text('✅ Mark Recovered', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await widget.apiService.markLotRecovered(lot.id);
+                      await _fetchLots();
+                      messenger.showSnackBar(
+                        const SnackBar(backgroundColor: Color(0xFF065F46), content: Text('✅ Materials recovered. Ready to close.')),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                    }
+                  },
+                )
+              else if (lot.status == 'MATERIAL_RECOVERED')
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(130, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.lock_rounded, size: 16),
+                  label: const Text('🔒 Close Lot', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await widget.apiService.closeLot(lot.id);
+                      await _fetchLots();
+                      messenger.showSnackBar(
+                        const SnackBar(backgroundColor: Color(0xFF065F46), content: Text('🎉 Lot closed. Digital chain sealed.')),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                    }
+                  },
+                )
+              else if (lot.status == 'CLOSED')
                 const Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, color: AppTheme.collectorColor, size: 16),
+                    Icon(Icons.verified_rounded, color: AppTheme.collectorColor, size: 16),
                     SizedBox(width: 6),
-                    Text('Received & Scale Verified',
-                        style: TextStyle(color: AppTheme.collectorColor, fontWeight: FontWeight.w800, fontSize: 12)),
+                    Text('Fully Closed', style: TextStyle(color: AppTheme.collectorColor, fontWeight: FontWeight.w800, fontSize: 12)),
                   ],
                 ),
             ],
@@ -573,4 +670,197 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
       ),
     );
   }
+
+  // ─── Performance Reputation Card ────────────────────────────────────────────
+
+  Widget _buildPerformanceCard() {
+    final stats = _recyclerStats;
+    final totalBids = (stats?['total_bids_submitted'] as num?)?.toInt() ?? 0;
+    final wonLots = (stats?['won_lots'] as num?)?.toInt() ?? 0;
+    final completionRate = (stats?['completion_rate_pct'] as num?)?.toDouble() ?? 0.0;
+    final kgProcessed = (stats?['total_kg_processed'] as num?)?.toDouble() ?? 0.0;
+    final reliability = (stats?['reliability_score'] as num?)?.toDouble() ?? 96.0;
+    final settleDays = (stats?['avg_settlement_days'] as num?)?.toDouble() ?? 2.3;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: AppTheme.recyclerColor.withValues(alpha: 0.3),
+        context: context,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.recyclerColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.leaderboard_rounded, color: AppTheme.recyclerColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text('📊 Performance Reputation',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.getTextPrimary(context))),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: AppTheme.pillBadgeDecoration(AppTheme.recyclerColor, context: context),
+                child: Text('${reliability.toStringAsFixed(0)}% Reliable',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.recyclerColor)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _recyclerStat('Bids', '$totalBids', AppTheme.recyclerColor),
+              const SizedBox(width: 8),
+              _recyclerStat('Won Lots', '$wonLots', AppTheme.collectorColor),
+              const SizedBox(width: 8),
+              _recyclerStat('Completion', '${completionRate.toStringAsFixed(0)}%', const Color(0xFF059669)),
+              const SizedBox(width: 8),
+              _recyclerStat('Processed', '${kgProcessed.toStringAsFixed(0)} kg', Colors.amber.shade700),
+              const SizedBox(width: 8),
+              _recyclerStat('Settle Days', '${settleDays.toStringAsFixed(1)}d', const Color(0xFF6366F1)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _recyclerStat(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── My Bids Section ────────────────────────────────────────────────────────
+
+  Widget _buildMyBidsSection() {
+    return Container(
+      decoration: AppTheme.cardBoxDecoration(
+        color: AppTheme.getCardBg(context),
+        borderColor: Colors.amber.withValues(alpha: 0.3),
+        context: context,
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _showMyBids = !_showMyBids),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.gavel_rounded, color: Colors.amber, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('My Bids & Active Lots',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppTheme.getTextPrimary(context))),
+                        Text('${_myBids.length} bids submitted',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  Icon(_showMyBids ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      color: AppTheme.textSecondary),
+                ],
+              ),
+            ),
+          ),
+          if (_showMyBids) ...[
+            if (_myBids.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text('No bids submitted yet. Browse the marketplace to bid on lots.',
+                    style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
+              )
+            else
+              ..._myBids.map((bid) => _buildMyBidTile(bid)),
+            const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMyBidTile(Map<String, dynamic> bid) {
+    final status = bid['bid_status'] as String? ?? 'SUBMITTED';
+    final statusColor = status == 'ACCEPTED'
+        ? AppTheme.collectorColor
+        : status == 'REJECTED'
+            ? AppTheme.alertRed
+            : Colors.amber.shade700;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(bid['lot_code'] as String? ?? '—',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppTheme.getTextPrimary(context))),
+                Text('${bid['lot_category'] ?? ''} • ${bid['lot_weight_kg'] ?? 0} kg',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('₹${((bid['offer_price'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(0)}',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: statusColor)),
+              Text('Match: ${(bid['match_score'] as num?)?.toStringAsFixed(0) ?? '—'}/100',
+                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(status,
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
+

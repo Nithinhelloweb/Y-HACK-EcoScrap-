@@ -236,3 +236,56 @@ def list_recyclers(db: Session = Depends(get_db)):
         }
         for r in recyclers
     ]
+
+
+@router.get("/profile/{user_id}")
+def get_dynamic_profile(user_id: str, db: Session = Depends(get_db)):
+    """
+    GET /api/auth/profile/{user_id}
+    Dynamic profile endpoint: returns trust score, earnings, lot count, and verification status.
+    Used by the Collector trust card and Recycler performance card.
+    """
+    from backend.app.models import Lot, Payment, Bid, BidStatus
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = _extract_profile_dict(user)
+
+    if user.role == "COLLECTOR" and user.collector_profile:
+        col = user.collector_profile
+        total_lots = db.query(Lot).filter(Lot.collector_id == col.id).count()
+        payments = db.query(Payment).filter(
+            Payment.collector_id == col.id,
+            Payment.status == "SETTLED"
+        ).all()
+        total_earnings = round(sum(p.amount for p in payments), 2)
+        profile.update({
+            "total_lots": total_lots,
+            "total_earnings_inr": total_earnings,
+            "is_verified": user.is_verified,
+            "name": user.name,
+            "phone": user.phone,
+        })
+
+    elif user.role == "RECYCLER" and user.recycler_profile:
+        rec = user.recycler_profile
+        bids = db.query(Bid).filter(Bid.recycler_id == rec.id).all()
+        won = sum(1 for b in bids if b.status == BidStatus.ACCEPTED)
+        kg_processed = 0.0
+        for b in bids:
+            if b.status == BidStatus.ACCEPTED:
+                lot = db.query(Lot).filter(Lot.id == b.lot_id).first()
+                if lot:
+                    kg_processed += lot.verified_weight_kg or lot.estimated_weight_kg
+        profile.update({
+            "total_bids": len(bids),
+            "won_lots": won,
+            "total_kg_processed": round(kg_processed, 2),
+            "completion_rate_pct": round((won / max(1, len(bids))) * 100, 1),
+            "is_verified": user.is_verified,
+            "name": user.name,
+            "phone": user.phone,
+        })
+
+    return {"user_id": user_id, "role": user.role, "profile": profile}

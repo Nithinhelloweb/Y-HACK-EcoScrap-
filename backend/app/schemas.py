@@ -380,3 +380,117 @@ class VoiceTTSRequest(BaseModel):
     text: str
     language: Optional[str] = "en"
 
+
+# ----------------- Collector Profile & Earnings -----------------
+class CollectorStatsResponse(BaseModel):
+    collector_id: str
+    collector_code: str
+    name: str
+    trust_score: float
+    training_completed: bool
+    service_area: str
+    total_lots: int
+    total_earnings_inr: float
+    is_verified: bool
+    last_active: Optional[str] = None
+
+
+# ----------------- Recycler Performance Reputation -----------------
+class RecyclerStatsResponse(BaseModel):
+    recycler_id: str
+    org_name: str
+    registration_no: str
+    reliability_score: float
+    total_bids_submitted: int
+    won_lots: int
+    completion_rate_pct: float
+    total_kg_processed: float
+    avg_settlement_days: float
+    accepted_materials: List[str]
+    daily_capacity_kg: float
+
+
+# ----------------- Admin User Management -----------------
+class AdminCollectorListItem(BaseModel):
+    user_id: str
+    collector_id: str
+    collector_code: str
+    name: str
+    phone: str
+    trust_score: float
+    total_lots: int
+    total_earnings_inr: float
+    is_verified: bool
+    training_completed: bool
+    service_area: str
+
+    model_config = {"from_attributes": True}
+
+
+class AdminRecyclerListItem(BaseModel):
+    user_id: str
+    recycler_id: str
+    org_name: str
+    registration_no: str
+    reliability_score: float
+    won_lots: int
+    total_kg_processed: float
+    is_verified: bool
+    accepted_materials: List[str]
+    daily_capacity_kg: float
+
+    model_config = {"from_attributes": True}
+
+
+# ----------------- Admin: Market Intelligence -----------------
+class MarketTrendItem(BaseModel):
+    category: str
+    avg_price_per_kg: float
+    total_lots: int
+    open_lots: int
+    closed_lots: int
+    avg_weight_kg: float
+
+
+class MarketTrendsResponse(BaseModel):
+    trends: List[MarketTrendItem]
+    top_categories: List[str]
+    total_market_value_inr: float
+    generated_at: str
+
+
+# ----------------- Admin: Environmental Summary -----------------
+class EnvironmentalSummaryResponse(BaseModel):
+    total_ewaste_diverted_kg: float
+    co2e_avoided_kg: float
+    toxic_heavy_metals_contained_g: float
+    trees_offset_equivalent: float
+    recovered_fractions_by_category: Dict[str, Dict[str, float]]
+    lots_closed_count: int
+    lots_in_processing_count: int
+
+
+# ----------------- Admin: Fraud Alerts -----------------
+class FraudAlertItem(BaseModel):
+    lot_id: str
+    lot_code: str
+    risk_type: str
+    severity: str
+    deviation_percentage: float
+    explanation: str
+    created_at: str
+
+
+class FraudAlertsResponse(BaseModel):
+    total_alerts: int
+    high_severity: int
+    medium_severity: int
+    low_severity: int
+    alerts: List[FraudAlertItem]
+
+
+# ----------------- Admin: Verify User -----------------
+class VerifyUserRequest(BaseModel):
+    user_id: str
+    verified: bool
+

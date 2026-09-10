@@ -207,3 +207,88 @@ def confirm_lot_handover(id: str, req_body: dict = {}, db: Session = Depends(get
     )
     return verify_handover(req=req, db=db)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  LOT LIFECYCLE: PROCESSING PIPELINE  (Recycler Side)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{id}/process")
+def mark_lot_processing(id: str, db: Session = Depends(get_db)):
+    """
+    POST /api/lots/{id}/process
+    Recycler marks the received lot as actively being dismantled/processed.
+    Transition: RECEIVED → PROCESSING
+    """
+    lot = db.query(Lot).filter((Lot.id == id) | (Lot.lot_code == id)).first()
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if lot.status not in (LotStatus.RECEIVED, LotStatus.HANDOVER_SCHEDULED, LotStatus.IN_TRANSIT):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lot is in status '{lot.status}'. Only RECEIVED/HANDOVER_SCHEDULED lots can be moved to PROCESSING."
+        )
+    lot.status = LotStatus.PROCESSING
+    lot.updated_at = datetime.utcnow()
+    db.commit()
+    record_chain_event(
+        db=db, lot_id=lot.id,
+        event_type="PROCESSING_STARTED",
+        payload={"lot_code": lot.lot_code, "weight_kg": lot.verified_weight_kg or lot.estimated_weight_kg}
+    )
+    return {"status": "OK", "lot_code": lot.lot_code, "new_status": LotStatus.PROCESSING,
+            "message": f"Lot {lot.lot_code} is now being processed / dismantled."}
+
+
+@router.post("/{id}/recover")
+def mark_lot_recovered(id: str, db: Session = Depends(get_db)):
+    """
+    POST /api/lots/{id}/recover
+    Recycler marks the lot as material recovery complete.
+    Transition: PROCESSING → MATERIAL_RECOVERED
+    """
+    lot = db.query(Lot).filter((Lot.id == id) | (Lot.lot_code == id)).first()
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if lot.status != LotStatus.PROCESSING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lot is in status '{lot.status}'. Only PROCESSING lots can be moved to MATERIAL_RECOVERED."
+        )
+    lot.status = LotStatus.MATERIAL_RECOVERED
+    lot.updated_at = datetime.utcnow()
+    db.commit()
+    record_chain_event(
+        db=db, lot_id=lot.id,
+        event_type="MATERIAL_RECOVERED",
+        payload={"lot_code": lot.lot_code, "category": lot.category}
+    )
+    return {"status": "OK", "lot_code": lot.lot_code, "new_status": LotStatus.MATERIAL_RECOVERED,
+            "message": f"Materials from lot {lot.lot_code} have been successfully recovered."}
+
+
+@router.post("/{id}/close")
+def close_lot(id: str, db: Session = Depends(get_db)):
+    """
+    POST /api/lots/{id}/close
+    Final closure of the lot after settlement is complete.
+    Transition: MATERIAL_RECOVERED → CLOSED
+    """
+    lot = db.query(Lot).filter((Lot.id == id) | (Lot.lot_code == id)).first()
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if lot.status not in (LotStatus.MATERIAL_RECOVERED, LotStatus.RECEIVED):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lot is in status '{lot.status}'. Only MATERIAL_RECOVERED lots can be CLOSED."
+        )
+    lot.status = LotStatus.CLOSED
+    lot.updated_at = datetime.utcnow()
+    db.commit()
+    record_chain_event(
+        db=db, lot_id=lot.id,
+        event_type="LOT_CLOSED",
+        payload={"lot_code": lot.lot_code, "category": lot.category, "final_weight_kg": lot.verified_weight_kg}
+    )
+    return {"status": "OK", "lot_code": lot.lot_code, "new_status": LotStatus.CLOSED,
+            "message": f"Lot {lot.lot_code} is now fully closed. Digital chain sealed."}
+
