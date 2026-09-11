@@ -396,4 +396,5 @@ def analyze_scrap_image(
         "ocr_confidence": ocr_result.get("ocr_confidence", 0.0),
         "estimated_weight_kg": default_weight,
         "quantity": 1.0,
+        "accelerator": component_analysis.get("accelerator"),
     }

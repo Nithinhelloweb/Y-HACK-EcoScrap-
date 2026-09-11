@@ -57,25 +57,98 @@ YOLO_ELECTRONICS_MAP = {
     "refrigerator": "MIXED_EWASTE",
 }
 
+_yolo_accelerator = "Uninitialized"
+_yolo_model_path = ""
+
+def _patch_ultralytics_onnx_gpu():
+    """
+    Patches Ultralytics ONNXBackend to enable DirectML GPU acceleration
+    on Windows (NVIDIA/AMD/Intel GPUs via DirectX 12) or CUDA when available.
+    """
+    try:
+        import ultralytics.nn.backends.onnx as ob
+        orig_load = getattr(ob.ONNXBackend, "_orig_load_model", None)
+        if orig_load is None:
+            ob.ONNXBackend._orig_load_model = ob.ONNXBackend.load_model
+            
+            def custom_load(self, weight):
+                if self.format != "dnn":
+                    try:
+                        import onnxruntime
+                        avail = onnxruntime.get_available_providers()
+                        providers = []
+                        if "DmlExecutionProvider" in avail:
+                            providers.append("DmlExecutionProvider")
+                        if "CUDAExecutionProvider" in avail:
+                            providers.append("CUDAExecutionProvider")
+                        providers.append("CPUExecutionProvider")
+                        
+                        logger.info(f"Configuring ONNX Runtime session with providers: {providers}")
+                        self.session = onnxruntime.InferenceSession(str(weight), providers=providers)
+                        self.output_names = [x.name for x in self.session.get_outputs()]
+                        metadata_map = self.session.get_modelmeta().custom_metadata_map
+                        if metadata_map:
+                            self.apply_metadata(dict(metadata_map))
+                        self.dynamic = isinstance(self.session.get_outputs()[0].shape[0], str)
+                        self.fp16 = "float16" in self.session.get_inputs()[0].type
+                        self.use_io_binding = False
+                        active = self.session.get_providers()
+                        logger.info(f"ONNX Runtime successfully loaded with active provider: {active[0] if active else 'CPU'}")
+                        return
+                    except Exception as e:
+                        logger.warning(f"DirectML/CUDA custom loader fallback to default: {e}")
+                return ob.ONNXBackend._orig_load_model(self, weight)
+                
+            ob.ONNXBackend.load_model = custom_load
+    except Exception as e:
+        logger.warning(f"Could not patch ONNXBackend for GPU: {e}")
+
+def get_vision_accelerator_info() -> Dict[str, Any]:
+    """Returns telemetry on the active computer vision model and GPU accelerator."""
+    global _yolo_accelerator, _yolo_model_path
+    if _yolo_model is None:
+        try:
+            get_yolo_model()
+        except Exception:
+            pass
+    return {
+        "accelerator": _yolo_accelerator,
+        "model_path": _yolo_model_path,
+        "is_gpu_accelerated": "GPU" in _yolo_accelerator or "DirectML" in _yolo_accelerator or "CUDA" in _yolo_accelerator
+    }
+
 def get_yolo_model():
     """
     Returns the loaded Ultralytics YOLO instance (singleton).
-    Prioritizes the fine-tuned E-Waste model extracted from EWaste_Final_Model.zip.
+    Prioritizes the fine-tuned ONNX E-Waste model with DirectML / CUDA GPU acceleration.
+    Falls back gracefully to PyTorch weights and CPU if necessary.
     Thread-safe.
     """
-    global _yolo_model
+    global _yolo_model, _yolo_accelerator, _yolo_model_path
     if _yolo_model is None:
         with _yolo_lock:
             if _yolo_model is None:
                 try:
+                    import torch
                     from ultralytics import YOLO
-                    fine_tuned_path = os.path.abspath(
+                    
+                    _patch_ultralytics_onnx_gpu()
+                    
+                    onnx_path = os.path.abspath(
+                        os.path.join(os.path.dirname(__file__), "..", "..", "models", "ewaste_detector", "best.onnx")
+                    )
+                    pt_path = os.path.abspath(
                         os.path.join(os.path.dirname(__file__), "..", "..", "models", "ewaste_detector", "best.pt")
                     )
+                    
                     candidates = [
+                        os.getenv("EWASTE_ONNX_PATH", ""),
+                        onnx_path,
+                        "backend/models/ewaste_detector/best.onnx",
+                        "models/ewaste_detector/best.onnx",
                         os.getenv("EWASTE_MODEL_PATH", ""),
                         os.getenv("YOLO_WEIGHTS_PATH", ""),
-                        fine_tuned_path,
+                        pt_path,
                         "backend/models/ewaste_detector/best.pt",
                         "models/ewaste_detector/best.pt",
                         "backend/best.pt",
@@ -83,15 +156,45 @@ def get_yolo_model():
                         "backend/yolov8n.pt",
                         "yolov8n.pt",
                     ]
-                    weights_path = fine_tuned_path if os.path.exists(fine_tuned_path) else "yolov8n.pt"
+                    weights_path = onnx_path if os.path.exists(onnx_path) else (pt_path if os.path.exists(pt_path) else "yolov8n.pt")
                     for c in candidates:
                         if c and os.path.exists(c):
                             weights_path = c
                             break
 
                     logger.info(f"Loading Fine-Tuned E-Waste YOLO model: {weights_path}")
-                    _yolo_model = YOLO(weights_path)
-                    logger.info(f"Fine-Tuned E-Waste YOLO model loaded successfully with {_yolo_model.names}.")
+                    _yolo_model = YOLO(weights_path, task="detect")
+                    _yolo_model_path = weights_path
+                    
+                    # Detect active acceleration
+                    if weights_path.endswith(".onnx"):
+                        try:
+                            import onnxruntime
+                            avail = onnxruntime.get_available_providers()
+                            if "DmlExecutionProvider" in avail:
+                                gpu_desc = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "DirectX 12 GPU"
+                                _yolo_accelerator = f"ONNX DirectML (GPU: {gpu_desc})"
+                            elif "CUDAExecutionProvider" in avail:
+                                _yolo_accelerator = f"ONNX CUDA (GPU: {torch.cuda.get_device_name(0)})"
+                            else:
+                                _yolo_accelerator = "ONNX CPUExecutionProvider"
+                        except Exception:
+                            _yolo_accelerator = "ONNX Runtime"
+                    else:
+                        if torch.cuda.is_available():
+                            _yolo_accelerator = f"PyTorch CUDA (GPU: {torch.cuda.get_device_name(0)})"
+                        else:
+                            _yolo_accelerator = "PyTorch CPU"
+                    
+                    # Warmup run to compile shaders/kernels so subsequent real-time calls are ultra-fast (<20ms)
+                    try:
+                        dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
+                        _yolo_model(dummy_frame, verbose=False)
+                        logger.info(f"E-Waste YOLO model warmup completed successfully on {_yolo_accelerator}.")
+                    except Exception as warmup_err:
+                        logger.warning(f"Warmup notice: {warmup_err}")
+
+                    logger.info(f"Fine-Tuned E-Waste YOLO model ready with {_yolo_model.names} on {_yolo_accelerator}.")
                 except Exception as e:
                     logger.error(f"Failed to load fine-tuned YOLO model: {e}")
                     raise
@@ -306,5 +409,6 @@ def detect_components_in_image(image_input: Any) -> Dict[str, Any]:
         "detected_components": detected_components,
         "estimated_fair_price": price_str,
         "model_version": "Fine-Tuned E-Waste YOLO (EWaste_Final_Model) + Multi-Modal Analyzer",
+        "accelerator": _yolo_accelerator,
         "total_components_detected": len(detected_components)
     }

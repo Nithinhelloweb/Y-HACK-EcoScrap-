@@ -96,6 +96,7 @@ class MaterialClassifyResponse(BaseModel):
     ocr_confidence: Optional[float] = None
     estimated_weight_kg: Optional[float] = 1.0
     quantity: Optional[float] = 1.0
+    accelerator: Optional[str] = None
 
 class OCRResponse(BaseModel):
     detected_text: str
@@ -375,6 +376,7 @@ class VoiceTranscriptionResponse(BaseModel):
     text: str
     detected_language: Optional[str] = None
     confidence: Optional[float] = None
+    accelerator: Optional[str] = None
 
 class VoiceTTSRequest(BaseModel):
     text: str

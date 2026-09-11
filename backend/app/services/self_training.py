@@ -260,12 +260,22 @@ def run_self_training(epochs: int = 5, batch_size: int = 4, imgsz: int = 416) ->
             now_iso = datetime.utcnow().isoformat()
             new_version = f"Fine-Tuned E-Waste YOLO (Self-Trained) v1.{len(samples) + 2}"
 
-            # Verify existing model can be referenced
+            # Verify existing model can be referenced and ensure ONNX model is available
             try:
                 from backend.app.services.local_vision import get_yolo_model
                 get_yolo_model()
+                models_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "..", "..", "models", "ewaste_detector")
+                )
+                pt_path = os.path.join(models_dir, "best.pt")
+                onnx_path = os.path.join(models_dir, "best.onnx")
+                if os.path.exists(pt_path) and not os.path.exists(onnx_path):
+                    from ultralytics import YOLO
+                    y = YOLO(pt_path)
+                    y.export(format="onnx")
+                    logger.info("Exported newly trained weights to best.onnx for GPU acceleration")
             except Exception as e:
-                logger.info(f"YOLO loader notice: {e}")
+                logger.info(f"YOLO loader/exporter notice: {e}")
 
             # Update state with improved training metrics
             _current_training_state["status"] = "COMPLETED"
