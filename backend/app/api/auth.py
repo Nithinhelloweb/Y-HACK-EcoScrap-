@@ -244,11 +244,28 @@ def get_dynamic_profile(user_id: str, db: Session = Depends(get_db)):
     GET /api/auth/profile/{user_id}
     Dynamic profile endpoint: returns trust score, earnings, lot count, and verification status.
     Used by the Collector trust card and Recycler performance card.
+    Gracefully handles 'default' alias to return default demo collector profile.
     """
-    from backend.app.models import Lot, Payment, Bid, BidStatus
-    user = db.query(User).filter(User.id == user_id).first()
+    from backend.app.models import Lot, Payment, Bid, BidStatus, CollectorProfile, RecyclerProfile
+    if user_id == "default":
+        user = db.query(User).filter(User.role == "COLLECTOR").first() or db.query(User).first()
+    else:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            col = db.query(CollectorProfile).filter(CollectorProfile.id == user_id).first()
+            if col and col.user:
+                user = col.user
+            else:
+                rec = db.query(RecyclerProfile).filter(RecyclerProfile.id == user_id).first()
+                if rec and rec.user:
+                    user = rec.user
+
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Fallback to any collector user
+        user = db.query(User).filter(User.role == "COLLECTOR").first() or db.query(User).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found")
 
     profile = _extract_profile_dict(user)
 

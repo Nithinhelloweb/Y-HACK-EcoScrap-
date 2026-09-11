@@ -15,28 +15,53 @@ def get_payments_for_collector(collector_id: str, db: Session = Depends(get_db))
     """
     GET /api/payments/collector/{collector_id}
     Full payment/settlement history for a specific collector (for earnings profile).
+    Gracefully resolves 'default' alias and prevents duplicate transaction references.
     """
-    payments = db.query(Payment).filter(Payment.collector_id == collector_id).order_by(Payment.created_at.desc()).all()
+    resolved_id = collector_id
+    if collector_id == "default":
+        col = db.query(CollectorProfile).first()
+        if col:
+            resolved_id = col.id
+
+    payments = db.query(Payment).filter(Payment.collector_id == resolved_id).order_by(Payment.created_at.desc()).all()
     if not payments:
-        col = db.query(CollectorProfile).filter(CollectorProfile.user_id == collector_id).first()
+        col = db.query(CollectorProfile).filter(CollectorProfile.user_id == resolved_id).first()
         if col:
             payments = db.query(Payment).filter(Payment.collector_id == col.id).order_by(Payment.created_at.desc()).all()
+            
     if not payments:
-        collector = db.query(CollectorProfile).first()
+        collector = db.query(CollectorProfile).filter(CollectorProfile.id == resolved_id).first()
+        if not collector:
+            collector = db.query(CollectorProfile).first()
+
         if collector:
-            demo = Payment(
-                transaction_reference=f"TXN-DEMO-{collector.id[:8].upper()}",
-                collector_id=collector.id,
-                amount=6050.0,
-                currency="INR",
-                status="SETTLED",
-                payment_method="UPI Direct Escrow",
-                settlement_date=datetime.now(timezone.utc),
-            )
-            db.add(demo)
-            db.commit()
-            db.refresh(demo)
-            payments = [demo]
+            # Check if demo payment already exists to prevent unique constraint violation
+            ref = f"TXN-DEMO-{collector.id[:8].upper()}"
+            existing = db.query(Payment).filter(
+                (Payment.transaction_reference == ref) | (Payment.collector_id == collector.id)
+            ).all()
+            if existing:
+                payments = existing
+            else:
+                import uuid
+                unique_ref = f"TXN-DEMO-{uuid.uuid4().hex[:8].upper()}"
+                demo = Payment(
+                    transaction_reference=unique_ref,
+                    collector_id=collector.id,
+                    amount=6050.0,
+                    currency="INR",
+                    status="SETTLED",
+                    payment_method="UPI Direct Escrow",
+                    settlement_date=datetime.now(timezone.utc),
+                )
+                try:
+                    db.add(demo)
+                    db.commit()
+                    db.refresh(demo)
+                    payments = [demo]
+                except Exception:
+                    db.rollback()
+                    payments = db.query(Payment).filter(Payment.collector_id == collector.id).all()
     return payments
 
 

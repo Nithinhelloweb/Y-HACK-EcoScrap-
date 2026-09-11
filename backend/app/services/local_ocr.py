@@ -42,6 +42,9 @@ def get_ocr_reader():
         with _ocr_lock:
             if _ocr_reader is None:
                 try:
+                    import logging as _logging
+                    _logging.getLogger("easyocr").setLevel(_logging.ERROR)
+                    _logging.getLogger("easyocr.easyocr").setLevel(_logging.ERROR)
                     import easyocr
                     logger.info("Initializing local EasyOCR reader (en)...")
                     _ocr_reader = easyocr.Reader(['en'], gpu=False)

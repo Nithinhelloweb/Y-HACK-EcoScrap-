@@ -103,6 +103,9 @@ def _patch_ultralytics_onnx_gpu():
     except Exception as e:
         logger.warning(f"Could not patch ONNXBackend for GPU: {e}")
 
+# Apply patch immediately on module load
+_patch_ultralytics_onnx_gpu()
+
 def get_vision_accelerator_info() -> Dict[str, Any]:
     """Returns telemetry on the active computer vision model and GPU accelerator."""
     global _yolo_accelerator, _yolo_model_path
