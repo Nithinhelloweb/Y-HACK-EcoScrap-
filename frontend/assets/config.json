@@ -1,0 +1,6 @@
+{
+  "api_url": "https://ecoscrap.srishakthicgpa.in/api",
+  "fallback_url": "http://127.0.0.1:8000/api",
+  "tunnel_domain": "ecoscrap.srishakthicgpa.in",
+  "environment": "production"
+}

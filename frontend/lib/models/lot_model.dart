@@ -203,16 +203,16 @@ class BidModel {
 
   factory BidModel.fromJson(Map<String, dynamic> json) {
     return BidModel(
-      id: json['id'] ?? '',
-      recyclerId: json['recycler_id'] ?? '',
-      recyclerName: json['recycler_name'] ?? 'Authorized Recycler',
+      id: json['id']?.toString() ?? '',
+      recyclerId: json['recycler_id']?.toString() ?? '',
+      recyclerName: json['recycler_name']?.toString() ?? 'Authorized Recycler',
       offerPrice: (json['offer_price'] as num?)?.toDouble() ?? 0.0,
       logisticsDeduction: (json['logistics_deduction'] as num?)?.toDouble() ?? 0.0,
       netCollectorPayable: (json['net_collector_payable'] as num?)?.toDouble() ?? 0.0,
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 80.0,
-      status: json['status'] ?? 'SUBMITTED',
-      isAnomaly: json['is_anomaly'] ?? false,
-      anomalyReason: json['anomaly_reason'],
+      status: json['status']?.toString() ?? 'SUBMITTED',
+      isAnomaly: json['is_anomaly'] == true,
+      anomalyReason: json['anomaly_reason']?.toString(),
     );
   }
 }
@@ -233,6 +233,7 @@ class LotModel {
   final String? qrCodeUrl;
   final List<BidModel> bids;
   final bool isOfflinePending;
+  final Map<String, dynamic>? recoveredMaterials;
 
   LotModel({
     required this.id,
@@ -250,26 +251,36 @@ class LotModel {
     this.qrCodeUrl,
     this.bids = const [],
     this.isOfflinePending = false,
+    this.recoveredMaterials,
   });
 
   factory LotModel.fromJson(Map<String, dynamic> json) {
     var rawBids = json['bids'] as List? ?? [];
     return LotModel(
-      id: json['id'] ?? '',
-      lotCode: json['lot_code'] ?? '',
-      collectorId: json['collector_id'] ?? '',
-      collectorCode: json['collector_code'] ?? 'COL-TN-019284',
-      category: json['category'] ?? '',
-      subcategory: json['subcategory'] ?? '',
+      id: json['id']?.toString() ?? '',
+      lotCode: json['lot_code']?.toString() ?? '',
+      collectorId: json['collector_id']?.toString() ?? '',
+      collectorCode: json['collector_code']?.toString() ?? 'COL-TN-019284',
+      category: json['category']?.toString() ?? '',
+      subcategory: json['subcategory']?.toString() ?? '',
       estimatedWeightKg: (json['estimated_weight_kg'] as num?)?.toDouble() ?? 0.0,
       verifiedWeightKg: (json['verified_weight_kg'] as num?)?.toDouble(),
-      condition: json['condition'] ?? 'mixed',
+      condition: json['condition']?.toString() ?? 'mixed',
       fairValueMin: (json['fair_value_min'] as num?)?.toDouble() ?? 0.0,
       fairValueMax: (json['fair_value_max'] as num?)?.toDouble() ?? 0.0,
-      status: json['status'] ?? 'OPEN_FOR_BIDS',
-      qrCodeUrl: json['qr_code_url'],
-      bids: rawBids.map((b) => BidModel.fromJson(b)).toList(),
-      isOfflinePending: json['is_offline_pending'] ?? false,
+      status: json['status']?.toString() ?? 'OPEN_FOR_BIDS',
+      qrCodeUrl: json['qr_code_url']?.toString(),
+      bids: rawBids
+          .map((b) => b is Map<String, dynamic>
+              ? BidModel.fromJson(b)
+              : BidModel.fromJson(Map<String, dynamic>.from(b as Map)))
+          .toList(),
+      isOfflinePending: json['is_offline_pending'] == true,
+      recoveredMaterials: json['recovered_materials'] is Map<String, dynamic>
+          ? json['recovered_materials'] as Map<String, dynamic>
+          : (json['recovered_materials'] != null
+              ? Map<String, dynamic>.from(json['recovered_materials'] as Map)
+              : null),
     );
   }
 
@@ -289,6 +300,7 @@ class LotModel {
       'status': status,
       'qr_code_url': qrCodeUrl,
       'is_offline_pending': isOfflinePending,
+      'recovered_materials': recoveredMaterials,
     };
   }
 }

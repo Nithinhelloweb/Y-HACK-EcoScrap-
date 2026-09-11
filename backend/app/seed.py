@@ -17,7 +17,11 @@ from backend.app.models import (
     PaymentStatus,
     Collection,
     CollectionItem,
-    CollectionStatus
+    CollectionStatus,
+    Dispute,
+    DisputeStatus,
+    DisputeType,
+    AuditLog
 )
 from backend.app.services.passport import generate_qr_for_lot
 from backend.app.services.ledger import record_chain_event
@@ -353,6 +357,60 @@ def seed_database():
             unit="bags"
         )
         db.add_all([item1, item2])
+
+        # Demo Dispute on Lot 2 (Weight Mismatch)
+        demo_dispute = Dispute(
+            lot_id=lot2.id,
+            raised_by_id=col1_profile.id,
+            raised_by_name="Murugan K.",
+            raised_by_role="COLLECTOR",
+            dispute_type=DisputeType.WEIGHT_MISMATCH,
+            description="Recycler scale declared 13.6 kg vs collector calibrated scale 14.2 kg (0.6 kg difference).",
+            evidence_notes="Photo of physical weighbridge slip uploaded at time of transfer.",
+            status=DisputeStatus.NEW,
+            created_at=datetime.utcnow()
+        )
+        db.add(demo_dispute)
+
+        # Demo Audit Logs
+        db.add_all([
+            AuditLog(
+                action="USER_VERIFIED",
+                actor_id="CPCB-TN-OFFICER-001",
+                actor_role="ADMIN",
+                entity_type="USER",
+                entity_id=col1_user.id,
+                details={"user_name": "Murugan K.", "role": "COLLECTOR", "cpcb_status": "VERIFIED"},
+                timestamp=datetime.utcnow()
+            ),
+            AuditLog(
+                action="LOT_CREATED",
+                actor_id=col1_profile.id,
+                actor_role="COLLECTOR",
+                entity_type="LOT",
+                entity_id=lot1.id,
+                details={"lot_code": lot1.lot_code, "category": "PCB", "weight_kg": 8.4},
+                timestamp=datetime.utcnow()
+            ),
+            AuditLog(
+                action="BID_ACCEPTED",
+                actor_id=col1_profile.id,
+                actor_role="COLLECTOR",
+                entity_type="BID",
+                entity_id=bid1.id,
+                details={"lot_code": lot1.lot_code, "offer_price": 5020.0, "recycler": "GreenTech Circular Solutions"},
+                timestamp=datetime.utcnow()
+            ),
+            AuditLog(
+                action="DISPUTE_RAISED",
+                actor_id=col1_profile.id,
+                actor_role="COLLECTOR",
+                entity_type="DISPUTE",
+                entity_id=demo_dispute.id,
+                details={"lot_code": lot2.lot_code, "dispute_type": "WEIGHT_MISMATCH"},
+                timestamp=datetime.utcnow()
+            )
+        ])
 
         db.commit()
         logger.info("Successfully seeded demo data for EcoScrap!")

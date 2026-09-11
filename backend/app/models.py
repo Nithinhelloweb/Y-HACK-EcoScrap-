@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import (
     Column,
     String,
@@ -120,6 +121,7 @@ class Lot(Base):
     status = Column(String(30), default=LotStatus.CREATED)
     photo_url = Column(String(255), nullable=True)
     qr_code_url = Column(String(255), nullable=True)
+    recovered_materials_json = Column(JSON, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -148,6 +150,11 @@ class Bid(Base):
 
     lot = relationship("Lot", back_populates="bids")
     recycler = relationship("RecyclerProfile", back_populates="bids")
+
+    @property
+    def recycler_name(self) -> Optional[str]:
+        return self.recycler.org_name if self.recycler and self.recycler.org_name else "Authorized Recycler"
+
 
 class HandoverEvent(Base):
     __tablename__ = "handover_events"
@@ -278,4 +285,54 @@ class VoiceToolLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class DisputeStatus:
+    NEW = "NEW"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    RESOLVED = "RESOLVED"
+    REJECTED = "REJECTED"
+
+
+class DisputeType:
+    WEIGHT_MISMATCH = "WEIGHT_MISMATCH"
+    MATERIAL_MISMATCH = "MATERIAL_MISMATCH"
+    PAYMENT_DELAY = "PAYMENT_DELAY"
+    DAMAGED_MATERIAL = "DAMAGED_MATERIAL"
+    SUSPICIOUS_PRICING = "SUSPICIOUS_PRICING"
+    OTHER = "OTHER"
+
+
+class Dispute(Base):
+    __tablename__ = "disputes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    lot_id = Column(String(36), ForeignKey("lots.id"), nullable=False, index=True)
+    raised_by_id = Column(String(36), nullable=False)
+    raised_by_name = Column(String(100), default="Collector")
+    raised_by_role = Column(String(30), default="COLLECTOR")  # COLLECTOR or RECYCLER
+    dispute_type = Column(String(50), default=DisputeType.WEIGHT_MISMATCH)
+    description = Column(Text, nullable=False)
+    evidence_notes = Column(Text, nullable=True)
+    status = Column(String(30), default=DisputeStatus.NEW)
+    resolution_decision = Column(String(50), nullable=True)  # APPROVE_COLLECTOR, APPROVE_RECYCLER, PARTIAL_SETTLEMENT, REJECT
+    resolution_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+
+    lot = relationship("Lot")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    action = Column(String(80), nullable=False, index=True)  # USER_VERIFIED, LOT_CREATED, BID_ACCEPTED, HANDOVER_COMPLETED, DISPUTE_RAISED, DISPUTE_RESOLVED, RECOVERY_RECORDED
+    actor_id = Column(String(36), nullable=True)
+    actor_role = Column(String(30), default="SYSTEM")
+    entity_type = Column(String(50), nullable=False)  # LOT, USER, BID, DISPUTE, SYSTEM
+    entity_id = Column(String(50), nullable=False)
+    details = Column(JSON, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
 

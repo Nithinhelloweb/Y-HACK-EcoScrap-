@@ -60,9 +60,28 @@ def test_price_anomaly_detector():
 def test_cryptographic_hash_chain_integrity():
     db = SessionLocal()
     lot = db.query(Lot).first()
-    assert lot is not None
+    if not lot:
+        from backend.app.models import CollectorProfile
+        collector = db.query(CollectorProfile).first()
+        lot = Lot(
+            lot_code="LOT-TEST-CHAIN-001",
+            collector_id=collector.id,
+            category="PCB",
+            subcategory="MOTHERBOARD",
+            estimated_weight_kg=12.0,
+            condition="mixed",
+            fair_value_min=4800.0,
+            fair_value_max=5400.0,
+            status="CREATED"
+        )
+        db.add(lot)
+        db.commit()
 
     events = db.query(ChainEvent).filter(ChainEvent.lot_id == lot.id).all()
+    if not events:
+        record_chain_event(db, lot.id, "LOT_CREATED", {"description": "Test lot created for cryptographic integrity", "actor": "COLLECTOR"})
+        events = db.query(ChainEvent).filter(ChainEvent.lot_id == lot.id).all()
+
     assert len(events) >= 1
     assert verify_lot_chain_integrity(events) is True
     db.close()
@@ -70,12 +89,31 @@ def test_cryptographic_hash_chain_integrity():
 def test_passport_endpoint():
     db = SessionLocal()
     lot = db.query(Lot).filter(Lot.category == "PCB").first() or db.query(Lot).first()
+    if not lot:
+        from backend.app.models import CollectorProfile
+        collector = db.query(CollectorProfile).first()
+        lot = Lot(
+            lot_code="LOT-TEST-PASSPORT-001",
+            collector_id=collector.id,
+            category="PCB",
+            subcategory="MOTHERBOARD",
+            estimated_weight_kg=10.0,
+            condition="mixed",
+            fair_value_min=4500.0,
+            fair_value_max=5500.0,
+            status="CREATED"
+        )
+        db.add(lot)
+        db.commit()
+        record_chain_event(db, lot.id, "LOT_CREATED", {"description": "Test lot created for passport test", "actor": "COLLECTOR"})
+
+    lot_code = lot.lot_code
     db.close()
 
-    res = client.get(f"/api/passport/{lot.lot_code}")
+    res = client.get(f"/api/passport/{lot_code}")
     assert res.status_code == 200
     data = res.json()
-    assert data["lot_code"] == lot.lot_code
+    assert data["lot_code"] == lot_code
     assert data["ledger_integrity_valid"] is True
     assert ("copper_kg" in data["recovered_fractions_estimate"] or 
             "precious_metal_bearing_resin_kg" in data["recovered_fractions_estimate"] or

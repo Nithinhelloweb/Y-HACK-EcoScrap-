@@ -355,6 +355,162 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
     );
   }
 
+  void _showRecordRecoveryDialog(LotModel lot) {
+    final copperCtrl = TextEditingController(text: '0.0');
+    final plasticCtrl = TextEditingController(text: '0.0');
+    final ferrousCtrl = TextEditingController(text: '0.0');
+    final preciousCtrl = TextEditingController(text: '0.0');
+    final aluCtrl = TextEditingController(text: '0.0');
+    final notesCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.getCardBg(context),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.recycling_rounded, color: Color(0xFF059669), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Record Recovery: ${lot.lotCode}',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.getTextPrimary(context)),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Log actual recovered material fractions separated from this ${lot.estimatedWeightKg} kg lot for EPR compliance & ledger attestation.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context)),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: copperCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Copper Extracted (kg)',
+                    prefixIcon: Icon(Icons.cable_rounded, color: Colors.deepOrange),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: plasticCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Engineering Plastics (kg)',
+                    prefixIcon: Icon(Icons.category_rounded, color: Colors.blue),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ferrousCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Ferrous / Steel (kg)',
+                    prefixIcon: Icon(Icons.hardware_rounded, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: preciousCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Precious Metals / Gold / Silver (g)',
+                    prefixIcon: Icon(Icons.diamond_rounded, color: Colors.amber),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: aluCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Aluminium Extracted (kg)',
+                    prefixIcon: Icon(Icons.layers_rounded, color: Colors.teal),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Smelter / Shredder Batch Ref & Notes',
+                    prefixIcon: Icon(Icons.notes_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: AppTheme.getTextSecondary(context))),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.check_circle_rounded, size: 18),
+              label: const Text('Record & Finalize', style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final copper = double.tryParse(copperCtrl.text.trim()) ?? 0.0;
+                final plastic = double.tryParse(plasticCtrl.text.trim()) ?? 0.0;
+                final ferrous = double.tryParse(ferrousCtrl.text.trim()) ?? 0.0;
+                final precious = double.tryParse(preciousCtrl.text.trim()) ?? 0.0;
+                final alu = double.tryParse(aluCtrl.text.trim()) ?? 0.0;
+                final notes = notesCtrl.text.trim();
+
+                final Map<String, double> fractions = {};
+                if (copper > 0) fractions['Copper_kg'] = copper;
+                if (plastic > 0) fractions['Plastics_kg'] = plastic;
+                if (ferrous > 0) fractions['Ferrous_kg'] = ferrous;
+                if (precious > 0) fractions['Precious_Gold_Silver_g'] = precious;
+                if (alu > 0) fractions['Aluminium_kg'] = alu;
+
+                Navigator.pop(ctx);
+                try {
+                  await widget.apiService.recordLotRecovery(
+                    lotId: lot.id,
+                    recoveredFractions: fractions,
+                    recyclerId: 'REC-DEMO',
+                    notes: notes.isEmpty ? null : notes,
+                  );
+                  await _fetchLots();
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Color(0xFF065F46),
+                      content: Text('✅ Recovery fractions sealed onto digital chain ledger!'),
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(backgroundColor: AppTheme.alertRed, content: Text('Error: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final handoverLots = _lots.where((l) => l.status == 'BID_SELECTED' || l.status == 'HANDOVER_SCHEDULED').toList();
@@ -780,6 +936,40 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
           const SizedBox(height: 10),
           Text('Fair Valuation: ₹${lot.fairValueMin.toStringAsFixed(0)} – ₹${lot.fairValueMax.toStringAsFixed(0)}',
               style: const TextStyle(color: AppTheme.collectorColor, fontWeight: FontWeight.w800, fontSize: 13)),
+          if (lot.recoveredMaterials != null && lot.recoveredMaterials!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('🌿 Recovered Fractions (Recorded):',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF059669))),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: lot.recoveredMaterials!.entries.map((e) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text('${e.key}: ${e.value}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -846,19 +1036,8 @@ class _RecyclerScreenState extends State<RecyclerScreen> {
                     elevation: 0,
                   ),
                   icon: const Icon(Icons.recycling_rounded, size: 16),
-                  label: const Text('✅ Mark Recovered', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                  onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    try {
-                      await widget.apiService.markLotRecovered(lot.id);
-                      await _fetchLots();
-                      messenger.showSnackBar(
-                        const SnackBar(backgroundColor: Color(0xFF065F46), content: Text('✅ Materials recovered. Ready to close.')),
-                      );
-                    } catch (e) {
-                      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  },
+                  label: const Text('✅ Record Fractions', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  onPressed: () => _showRecordRecoveryDialog(lot),
                 )
               else if (lot.status == 'MATERIAL_RECOVERED')
                 ElevatedButton.icon(

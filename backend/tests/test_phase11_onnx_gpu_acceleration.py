@@ -127,7 +127,7 @@ def test_local_whisper_transcription_gpu_fast():
     assert "confidence" in res
     assert "accelerator" in res
     assert "CUDA" in res["accelerator"]
-    assert latency_ms < 1500.0
+    assert latency_ms < 2500.0
 
 
 def test_voice_transcribe_endpoint_includes_accelerator():

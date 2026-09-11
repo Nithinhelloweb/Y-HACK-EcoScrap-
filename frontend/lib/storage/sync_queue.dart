@@ -27,11 +27,15 @@ class QueuedVoiceAction {
 
   factory QueuedVoiceAction.fromJson(Map<String, dynamic> json) =>
       QueuedVoiceAction(
-        id: json['id'] as String,
-        rawText: json['raw_text'] as String,
-        intent: json['intent'] as String?,
-        payload: json['payload'] as Map<String, dynamic>? ?? {},
-        timestamp: DateTime.parse(json['timestamp'] as String),
+        id: json['id']?.toString() ?? '',
+        rawText: json['raw_text']?.toString() ?? '',
+        intent: json['intent']?.toString(),
+        payload: json['payload'] is Map<String, dynamic>
+            ? json['payload'] as Map<String, dynamic>
+            : (json['payload'] != null ? Map<String, dynamic>.from(json['payload'] as Map) : {}),
+        timestamp: json['timestamp'] != null
+            ? (DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now())
+            : DateTime.now(),
       );
 }
 

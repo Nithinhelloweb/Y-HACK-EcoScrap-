@@ -151,17 +151,17 @@ class _CollectorScreenState extends State<CollectorScreen> {
               child: ListView(
                 shrinkWrap: true,
                 children: protocols.values.map<Widget>((p) {
-                  final data = p as Map<String, dynamic>;
-                  final title = (lang == 'ta' && data['title_ta'] != null)
-                      ? data['title_ta']
+                  final data = p is Map<String, dynamic> ? p : (p is Map ? Map<String, dynamic>.from(p) : <String, dynamic>{});
+                  final String title = (lang == 'ta' && data['title_ta'] != null)
+                      ? data['title_ta'].toString()
                       : (lang == 'hi' && data['title_hi'] != null)
-                          ? data['title_hi']
-                          : data['title_en'] ?? data['hazard_type'];
-                  final sops = (lang == 'ta' && data['handling_sop_ta'] != null)
-                      ? data['handling_sop_ta'] as List
-                      : (lang == 'hi' && data['handling_sop_hi'] != null)
-                          ? data['handling_sop_hi'] as List
-                          : data['handling_sop'] as List;
+                          ? data['title_hi'].toString()
+                          : (data['title_en'] ?? data['hazard_type'] ?? 'Safety Protocol').toString();
+                  final List sops = (lang == 'ta' && data['handling_sop_ta'] is List)
+                      ? (data['handling_sop_ta'] as List)
+                      : (lang == 'hi' && data['handling_sop_hi'] is List)
+                          ? (data['handling_sop_hi'] as List)
+                          : (data['handling_sop'] is List ? (data['handling_sop'] as List) : const []);
                   final isCritical = data['hazard_level'] == 'CRITICAL';
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -893,13 +893,11 @@ class _CollectorScreenState extends State<CollectorScreen> {
                   elevation: 0,
                 ),
                 icon: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
-                label: const Flexible(
-                  child: Text(
-                    'Voice Assistant',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
+                label: const Text(
+                  'Voice Assistant',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -924,13 +922,11 @@ class _CollectorScreenState extends State<CollectorScreen> {
                   elevation: 0,
                 ),
                 icon: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
-                label: Flexible(
-                  child: Text(
-                    t('ai_lens_btn'),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
+                label: Text(
+                  t('ai_lens_btn'),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 onPressed: _showAICameraDialog,
               ),
@@ -949,13 +945,11 @@ class _CollectorScreenState extends State<CollectorScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 icon: const Icon(Icons.shield_rounded, color: AppTheme.alertAmber, size: 17),
-                label: Flexible(
-                  child: Text(
-                    t('safety_protocols_btn'),
-                    style: const TextStyle(color: AppTheme.alertAmber, fontWeight: FontWeight.w700, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
+                label: Text(
+                  t('safety_protocols_btn'),
+                  style: const TextStyle(color: AppTheme.alertAmber, fontWeight: FontWeight.w700, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 onPressed: _showSafetyProtocolsDialog,
               ),
@@ -1936,16 +1930,17 @@ class _CollectorScreenState extends State<CollectorScreen> {
                 child: DropdownButtonFormField<String>(
                   key: ValueKey(normalizedCategory),
                   initialValue: normalizedCategory,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Category'),
                   dropdownColor: AppTheme.getCardBg(context),
                   items: const [
-                    DropdownMenuItem(value: 'ITEW', child: Text('Smartphones & Handsets')),
-                    DropdownMenuItem(value: 'PCB', child: Text('PCB Circuit Boards')),
-                    DropdownMenuItem(value: 'BATTERY', child: Text('Batteries (Li-Ion/Pb)')),
-                    DropdownMenuItem(value: 'CABLE', child: Text('Cables & Wiring')),
-                    DropdownMenuItem(value: 'IT_EQUIPMENT', child: Text('IT Scrap & Laptops')),
-                    DropdownMenuItem(value: 'DISPLAY', child: Text('Displays & Monitors')),
-                    DropdownMenuItem(value: 'MIXED_SCRAP', child: Text('Mixed E-Waste')),
+                    DropdownMenuItem(value: 'ITEW', child: Text('Smartphones & Handsets', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'PCB', child: Text('PCB Circuit Boards', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'BATTERY', child: Text('Batteries (Li-Ion/Pb)', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'CABLE', child: Text('Cables & Wiring', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'IT_EQUIPMENT', child: Text('IT Scrap & Laptops', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'DISPLAY', child: Text('Displays & Monitors', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'MIXED_SCRAP', child: Text('Mixed E-Waste', overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -1971,10 +1966,11 @@ class _CollectorScreenState extends State<CollectorScreen> {
             child: Row(
               children: _getSubcategoriesForCategory(normalizedCategory).map((sub) {
                 final isSelected = _selectedSubcategory == sub['value'];
+                final labelText = (sub['label'] ?? sub['value'] ?? 'Option').toString();
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: ChoiceChip(
-                    label: Text(sub['label']!),
+                    label: Text(labelText),
                     selected: isSelected,
                     selectedColor: AppTheme.collectorColor.withValues(alpha: 0.18),
                     labelStyle: TextStyle(
@@ -1988,7 +1984,7 @@ class _CollectorScreenState extends State<CollectorScreen> {
                     backgroundColor: AppTheme.getSurface(context),
                     onSelected: (selected) {
                       if (selected) {
-                        setState(() => _selectedSubcategory = sub['value']!);
+                        setState(() => _selectedSubcategory = sub['value']?.toString() ?? '');
                         _fetchFairValue();
                       }
                     },
@@ -2089,11 +2085,173 @@ class _CollectorScreenState extends State<CollectorScreen> {
                         style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
                   ),
                 ...lot.bids.map((b) => _buildBidTile(lot, b)),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.alertAmber,
+                      side: BorderSide(color: AppTheme.alertAmber.withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.report_problem_rounded, size: 14),
+                    label: const Text('Raise Dispute / Weight Issue', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    onPressed: () => _showRaiseDisputeDialog(lot),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showRaiseDisputeDialog(LotModel lot) {
+    String selectedType = 'WEIGHT_MISMATCH';
+    final descCtrl = TextEditingController();
+    final evidenceCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.getCardBg(context),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: AppTheme.alertAmber.withValues(alpha: 0.5)),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.alertAmber.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.gavel_rounded, color: AppTheme.alertAmber, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Raise Dispute: ${lot.lotCode}',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.getTextPrimary(context)),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dispute Reason:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.getTextSecondary(context)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedType,
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      dropdownColor: AppTheme.getCardBg(context),
+                      items: const [
+                        DropdownMenuItem(value: 'WEIGHT_MISMATCH', child: Text('Scale Weight Mismatch')),
+                        DropdownMenuItem(value: 'MATERIAL_MISMATCH', child: Text('Material Disagreement')),
+                        DropdownMenuItem(value: 'PAYMENT_DELAY', child: Text('Payment / Escrow Delay')),
+                        DropdownMenuItem(value: 'DAMAGED_MATERIAL', child: Text('Damaged Material Claim')),
+                        DropdownMenuItem(value: 'SUSPICIOUS_PRICING', child: Text('Suspicious / Predatory Offer')),
+                        DropdownMenuItem(value: 'OTHER', child: Text('Other Dispute')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedType = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Dispute Description:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.getTextSecondary(context)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Describe the issue (e.g. Weighbridge differed by 0.6 kg)...',
+                        contentPadding: EdgeInsets.all(12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Evidence Notes (Optional):',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.getTextSecondary(context)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: evidenceCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'E.g. Weigh slip photo, transaction reference...',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: Text('Cancel', style: TextStyle(color: AppTheme.getTextSecondary(context))),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.alertAmber,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.send_rounded, size: 16),
+                  label: const Text('Submit to Admin', style: TextStyle(fontWeight: FontWeight.w800)),
+                  onPressed: () async {
+                    if (descCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a description for the dispute.')),
+                      );
+                      return;
+                    }
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await widget.apiService.createDispute(
+                        lotId: lot.id,
+                        raisedById: lot.collectorId,
+                        raisedByName: 'Murugan K.',
+                        raisedByRole: 'COLLECTOR',
+                        disputeType: selectedType,
+                        description: descCtrl.text.trim(),
+                        evidenceNotes: evidenceCtrl.text.trim().isNotEmpty ? evidenceCtrl.text.trim() : null,
+                      );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: AppTheme.alertAmber,
+                          content: Text('⚠️ Dispute submitted! CPCB admin review queue notified.'),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not submit dispute: $e')),
+                      );
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

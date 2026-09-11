@@ -445,12 +445,10 @@ class _PassportScreenState extends State<PassportScreen> {
   }
 
   Widget _buildLedgerBlock(BuildContext context, dynamic ev) {
-    final prev = (ev['previous_hash'] as String? ?? '').length >= 16
-        ? (ev['previous_hash'] as String).substring(0, 16)
-        : (ev['previous_hash'] ?? '');
-    final curr = (ev['current_hash'] as String? ?? '').length >= 16
-        ? (ev['current_hash'] as String).substring(0, 16)
-        : (ev['current_hash'] ?? '');
+    final prevStr = ev['previous_hash']?.toString() ?? '';
+    final prev = prevStr.length >= 16 ? prevStr.substring(0, 16) : prevStr;
+    final currStr = ev['current_hash']?.toString() ?? '';
+    final curr = currStr.length >= 16 ? currStr.substring(0, 16) : currStr;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

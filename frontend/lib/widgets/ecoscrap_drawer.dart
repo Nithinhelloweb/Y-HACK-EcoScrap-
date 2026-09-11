@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../i18n/translations.dart';
 import 'ecoscrap_logo.dart';
+import 'server_config_dialog.dart';
 
 class EcoScrapDrawer extends StatelessWidget {
   final UserModel user;
@@ -113,6 +114,11 @@ class EcoScrapDrawer extends StatelessWidget {
 
                   // Appearance & Settings
                   _buildAppearanceTile(context),
+
+                  const SizedBox(height: 8),
+
+                  // Server & Cloudflare Settings
+                  _buildServerConfigTile(context),
 
                   const SizedBox(height: 10),
 
@@ -543,6 +549,62 @@ class EcoScrapDrawer extends StatelessWidget {
     );
   }
 
+  Widget _buildServerConfigTile(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.getSurface(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.getBorder(context)),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).pop();
+          ServerConfigDialog.show(context, apiService: apiService);
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_queue_rounded, size: 18, color: Color(0xFFF6821F)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Server & Cloudflare',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.getTextPrimary(context),
+                          ),
+                        ),
+                        Text(
+                          apiService.baseUrl,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            color: AppTheme.getTextSecondary(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLanguageRow(BuildContext context) {
     return Row(
       children: [
@@ -607,6 +669,7 @@ class EcoScrapDrawer extends StatelessWidget {
           label: Text(t('logout_btn'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
           onPressed: () async {
             Navigator.of(context).pop();
+            await offlineStore.clearAllLots();
             await authService.logout();
           },
         ),
@@ -691,6 +754,16 @@ class EcoScrapDrawer extends StatelessWidget {
             icon: Icons.people_alt_rounded,
           ),
           _DrawerNavConfig(
+            title: 'Disputes & Triage Queue',
+            subtitle: 'Weight discrepancies, settlements',
+            icon: Icons.gavel_rounded,
+          ),
+          _DrawerNavConfig(
+            title: 'Geo & Integrations Hub',
+            subtitle: 'Regional hubs, duplicate scanner, audit',
+            icon: Icons.hub_rounded,
+          ),
+          _DrawerNavConfig(
             title: 'Market Intelligence',
             subtitle: 'Pricing trends, floor rates, period data',
             icon: Icons.trending_up_rounded,
@@ -699,11 +772,6 @@ class EcoScrapDrawer extends StatelessWidget {
             title: 'Environmental Impact',
             subtitle: 'CO₂ savings, toxic metal diversion',
             icon: Icons.eco_rounded,
-          ),
-          _DrawerNavConfig(
-            title: 'Fraud & Risk Alerts',
-            subtitle: 'Predatory bids, suspicious deviations',
-            icon: Icons.warning_amber_rounded,
           ),
           _DrawerNavConfig(
             title: 'Universal Passport Inspector',

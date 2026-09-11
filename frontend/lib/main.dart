@@ -13,6 +13,7 @@ import 'theme/app_theme.dart';
 import 'widgets/responsive_container.dart';
 import 'widgets/ecoscrap_logo.dart';
 import 'widgets/ecoscrap_drawer.dart';
+import 'widgets/server_config_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,20 +24,26 @@ void main() async {
   final authService = AuthService();
   await authService.init();
 
+  final apiService = ApiService();
+  await apiService.init();
+
   runApp(EcoScrapApp(
     offlineStore: offlineStore,
     authService: authService,
+    apiService: apiService,
   ));
 }
 
 class EcoScrapApp extends StatefulWidget {
   final OfflineStore offlineStore;
   final AuthService? authService;
+  final ApiService? apiService;
 
   const EcoScrapApp({
     super.key,
     required this.offlineStore,
     this.authService,
+    this.apiService,
   });
 
   @override
@@ -44,7 +51,7 @@ class EcoScrapApp extends StatefulWidget {
 }
 
 class _EcoScrapAppState extends State<EcoScrapApp> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   late final AuthService _authService;
   String _currentLang = 'en';
 
@@ -63,6 +70,8 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
+    _apiService.init();
     _authService = widget.authService ?? AuthService();
     _authService.addListener(_onAuthChanged);
     _loadThemePreference();
@@ -250,17 +259,34 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
           label: 'Users',
         ),
         NavigationDestination(
+          icon: Icon(Icons.gavel_outlined),
+          selectedIcon: Icon(Icons.gavel_rounded),
+          label: 'Disputes',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.hub_outlined),
+          selectedIcon: Icon(Icons.hub_rounded),
+          label: 'Geo Hub',
+        ),
+        NavigationDestination(
           icon: Icon(Icons.trending_up_rounded),
           selectedIcon: Icon(Icons.trending_up_rounded),
           label: 'Market',
         ),
-        NavigationDestination(
-          icon: Icon(Icons.eco_outlined),
-          selectedIcon: Icon(Icons.eco_rounded),
-          label: 'Ecosystem',
-        ),
       ];
-      bottomNavIndex = _adminSubTab.clamp(0, 3);
+      if (_adminSubTab == 0) {
+        bottomNavIndex = 0;
+      } else if (_adminSubTab == 1) {
+        bottomNavIndex = 1;
+      } else if (_adminSubTab == 2) {
+        bottomNavIndex = 2;
+      } else if (_adminSubTab == 3) {
+        bottomNavIndex = 3;
+      } else if (_adminSubTab == 4) {
+        bottomNavIndex = 4;
+      } else {
+        bottomNavIndex = 0;
+      }
     }
 
     return Scaffold(
@@ -317,7 +343,19 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
         actions: [
           // Live Sync Status Pill (Visible on both Mobile & Desktop!)
           _buildAppBarSyncPill(context, roleColor),
-          const SizedBox(width: 6),
+          const SizedBox(width: 2),
+
+          // Server & Cloudflare Tunnel Settings Button
+          IconButton(
+            icon: const Icon(Icons.cloud_queue_rounded, color: Color(0xFFF6821F), size: 20),
+            tooltip: 'Server & Cloudflare Tunnel Settings',
+            onPressed: () => ServerConfigDialog.show(
+              context,
+              apiService: _apiService,
+              onServerChanged: () => setState(() {}),
+            ),
+          ),
+          const SizedBox(width: 2),
 
           // Theme Toggle Button
           IconButton(
@@ -413,6 +451,7 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
               icon: const Icon(Icons.logout_rounded, color: AppTheme.alertRed, size: 20),
               tooltip: t('logout_btn'),
               onPressed: () async {
+                await widget.offlineStore.clearAllLots();
                 await _authService.logout();
               },
             ),
@@ -522,8 +561,28 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
       } else {
         // ADMIN
         _topScreenIndex = 0;
-        _adminSubTab = index.clamp(0, 3);
-        _drawerNavIndex = index.clamp(0, 3);
+        switch (index) {
+          case 0:
+            _adminSubTab = 0;
+            _drawerNavIndex = 0;
+            break;
+          case 1:
+            _adminSubTab = 1;
+            _drawerNavIndex = 1;
+            break;
+          case 2:
+            _adminSubTab = 2; // Disputes
+            _drawerNavIndex = 2;
+            break;
+          case 3:
+            _adminSubTab = 3; // Geo Hub
+            _drawerNavIndex = 3;
+            break;
+          case 4:
+            _adminSubTab = 4; // Market
+            _drawerNavIndex = 4;
+            break;
+        }
       }
     });
   }
@@ -588,17 +647,21 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
             break;
           case 2:
             _topScreenIndex = 0;
-            _adminSubTab = 2; // Market Intel
+            _adminSubTab = 2; // Disputes
             break;
           case 3:
             _topScreenIndex = 0;
-            _adminSubTab = 3; // Ecosystem
+            _adminSubTab = 3; // Geo Hub
             break;
           case 4:
             _topScreenIndex = 0;
-            _adminSubTab = 0; // Overview
+            _adminSubTab = 4; // Market Intel
             break;
           case 5:
+            _topScreenIndex = 0;
+            _adminSubTab = 5; // Ecosystem
+            break;
+          case 6:
             _topScreenIndex = 1; // Passport
             break;
         }
@@ -644,12 +707,14 @@ class _EcoScrapAppState extends State<EcoScrapApp> {
         case 1:
           return 'User Verification & KYC';
         case 2:
-          return 'Market Intelligence';
+          return 'Disputes & Triage Queue';
         case 3:
-          return 'Environmental Impact';
+          return 'Geo & Integrations Hub';
         case 4:
-          return 'Fraud & Risk Alerts';
+          return 'Market Intelligence';
         case 5:
+          return 'Environmental Impact';
+        case 6:
           return 'Universal Passport Inspector';
         default:
           return 'Regulatory Oversight';

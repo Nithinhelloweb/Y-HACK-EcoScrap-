@@ -75,6 +75,19 @@ class OfflineStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearAllLots() async {
+    _inMemoryLots.clear();
+    _pendingOutbox.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cachedLotsKey);
+      await prefs.remove(_outboxKey);
+    } catch (e) {
+      debugPrint('OfflineStore clearAllLots error: $e');
+    }
+    notifyListeners();
+  }
+
   Future<LotModel> addLot({
     required String category,
     required String subcategory,

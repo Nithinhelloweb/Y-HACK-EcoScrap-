@@ -207,6 +207,7 @@ class LotResponse(BaseModel):
     status: str
     photo_url: Optional[str] = None
     qr_code_url: Optional[str] = None
+    recovered_materials: Optional[Dict[str, Any]] = None
     created_at: datetime
     bids: List[BidResponse] = []
 
@@ -495,4 +496,143 @@ class FraudAlertsResponse(BaseModel):
 class VerifyUserRequest(BaseModel):
     user_id: str
     verified: bool
+
+
+# ----------------- Disputes Schemas -----------------
+class DisputeCreateRequest(BaseModel):
+    lot_id: str
+    raised_by_id: str
+    raised_by_name: Optional[str] = "Collector"
+    raised_by_role: Optional[str] = "COLLECTOR"  # COLLECTOR or RECYCLER
+    dispute_type: str = "WEIGHT_MISMATCH"  # WEIGHT_MISMATCH, MATERIAL_MISMATCH, PAYMENT_DELAY, DAMAGED_MATERIAL, SUSPICIOUS_PRICING, OTHER
+    description: str
+    evidence_notes: Optional[str] = None
+
+
+class DisputeResolveRequest(BaseModel):
+    resolution_decision: str  # APPROVE_COLLECTOR, APPROVE_RECYCLER, PARTIAL_SETTLEMENT, REJECT
+    resolution_notes: str
+    settlement_adjustment_inr: Optional[float] = 0.0
+
+
+class DisputeResponse(BaseModel):
+    id: str
+    lot_id: str
+    lot_code: Optional[str] = None
+    raised_by_id: str
+    raised_by_name: str
+    raised_by_role: str
+    dispute_type: str
+    description: str
+    evidence_notes: Optional[str] = None
+    status: str
+    resolution_decision: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    created_at: str
+    resolved_at: Optional[str] = None
+
+
+# ----------------- Recycler Recovery Fractions -----------------
+class RecoveryRecordRequest(BaseModel):
+    lot_id: str
+    recycler_id: Optional[str] = None
+    recovered_fractions: Dict[str, float]  # e.g. {"Copper_kg": 2.1, "Gold_g": 0.45, "Plastics_kg": 3.2, "Steel_kg": 1.8}
+    residual_waste_kg: Optional[float] = 0.0
+    notes: Optional[str] = None
+
+
+class RecoveryRecordResponse(BaseModel):
+    status: str
+    lot_id: str
+    lot_code: str
+    lot_status: str
+    recovered_materials: Dict[str, float]
+    total_recovered_weight_kg: float
+    message: str
+
+
+# ----------------- Duplicate Lot Detection -----------------
+class DuplicateCheckRequest(BaseModel):
+    category: str
+    subcategory: str
+    estimated_weight_kg: float
+    collector_id: Optional[str] = None
+    tolerance_weight_pct: Optional[float] = 10.0
+
+
+class DuplicateMatchItem(BaseModel):
+    lot_id: str
+    lot_code: str
+    collector_id: str
+    category: str
+    subcategory: str
+    estimated_weight_kg: float
+    similarity_score_pct: float
+    duplicate_reasons: List[str]
+    created_at: str
+
+
+class DuplicateCheckResponse(BaseModel):
+    is_suspected_duplicate: bool
+    highest_similarity_score: float
+    potential_matches_count: int
+    matches: List[DuplicateMatchItem]
+
+
+# ----------------- Geographic Intelligence -----------------
+class GeoClusterHub(BaseModel):
+    hub_id: str
+    hub_name: str
+    district: str
+    latitude: float
+    longitude: float
+    active_collectors_count: int
+    verified_recyclers_count: int
+    total_lots_count: int
+    monthly_collection_volume_kg: float
+    primary_materials: List[str]
+    demand_supply_status: str  # BALANCED, HIGH_SUPPLY, HIGH_DEMAND
+
+
+class GeographicIntelligenceResponse(BaseModel):
+    region: str
+    total_hubs: int
+    hubs: List[GeoClusterHub]
+    generated_at: str
+
+
+# ----------------- Ecosystem Integrations -----------------
+class IntegrationPartnerItem(BaseModel):
+    system_code: str
+    system_name: str
+    stakeholder_type: str  # REGULATOR, SPCB, PRO_EPR, PAYMENT, LOGISTICS, MAPS
+    integration_status: str  # INTEGRATION_READY, SIMULATED, VERIFIED
+    last_sync_timestamp: str
+    api_protocol: str
+    compliance_standard: str
+    notes: str
+
+
+class IntegrationsResponse(BaseModel):
+    total_connectors: int
+    active_connectors: int
+    connectors: List[IntegrationPartnerItem]
+
+
+# ----------------- Audit Logs -----------------
+class AuditLogItem(BaseModel):
+    id: str
+    action: str
+    actor_id: Optional[str] = None
+    actor_role: str
+    entity_type: str
+    entity_id: str
+    details: Optional[Dict[str, Any]] = None
+    timestamp: str
+
+
+class AuditLogResponse(BaseModel):
+    total_logs: int
+    logs: List[AuditLogItem]
+
 

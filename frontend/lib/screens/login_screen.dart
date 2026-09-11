@@ -5,6 +5,7 @@ import '../i18n/translations.dart';
 import '../theme/app_theme.dart';
 
 import '../widgets/ecoscrap_logo.dart';
+import '../widgets/server_config_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
@@ -158,6 +159,18 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         actions: [
+          // Server / Cloudflare Config
+          IconButton(
+            icon: const Icon(Icons.cloud_queue_rounded, color: Color(0xFFF6821F), size: 20),
+            tooltip: 'Server & Cloudflare Tunnel Settings',
+            onPressed: () => ServerConfigDialog.show(
+              context,
+              apiService: widget.apiService,
+              onServerChanged: () => setState(() {}),
+            ),
+          ),
+          const SizedBox(width: 2),
+
           // Theme Toggle in Login AppBar
           if (widget.onToggleTheme != null) ...[
             IconButton(
